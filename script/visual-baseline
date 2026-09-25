@@ -1,0 +1,253 @@
+#!/usr/bin/env python3
+"""Visual regression baselines for the studio's live specimens.
+
+    script/visual-baseline update [--url URL]
+    script/visual-baseline check  [--url URL] [--tolerance 0.0] [--threshold 0] [--diff-dir DIR]
+
+Captures each live specimen (shell desktop, Hunk window, foundation swatches,
+and the Windows view's tiled desktop, terminal, and browser, light and dark) in headless Chromium at a fixed 1600×1000 viewport,
+device scale factor 1, with animations and transitions disabled, and stores
+PNGs in tests/baselines/. `check` recaptures and compares pixel by pixel.
+
+Without --url a private studio instance is started on a free port against the
+canonical tokens (read-only; nothing is saved). Captures depend on the
+installed fonts (Inter, Iosevka Nerd Font Mono) and the Chromium build, so
+baselines are only meaningful on the machine that recorded them.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import pathlib
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.request
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+import cdp  # noqa: E402
+import visual  # noqa: E402
+
+BASELINES = ROOT / "tests" / "baselines"
+VIEWPORT = (1600, 1000)
+SPECIMENS = {
+    "shell-light": ("shell", "#shell-view .desktop.light-preview"),
+    "shell-dark": ("shell", "#shell-view .desktop.dark-preview"),
+    "hunk-light": ("hunk", "#hunk-view .hunk-window.light-preview"),
+    "hunk-dark": ("hunk", "#hunk-view .hunk-window.dark-preview"),
+    "foundations-light": ("foundations", '#foundation-grid .foundation-mode[data-preview-mode="light"]'),
+    "foundations-dark": ("foundations", '#foundation-grid .foundation-mode[data-preview-mode="dark"]'),
+    "windows-light": ("windows", "#windows-view .desktop-specimen.light-preview"),
+    "windows-dark": ("windows", "#windows-view .desktop-specimen.dark-preview"),
+    "terminal-light": ("windows", "#windows-view .terminal-stage.light-preview"),
+    "terminal-dark": ("windows", "#windows-view .terminal-stage.dark-preview"),
+    "browser-light": ("windows", "#windows-view .browser-stage.light-preview"),
+    "browser-dark": ("windows", "#windows-view .browser-stage.dark-preview"),
+}
+# Views whose specimens load content asynchronously: an expression that is
+# truthy once they are ready, and a promise to await before capturing.
+READY = {
+    "windows": (
+        "(() => { const screens = [...document.querySelectorAll('#windows-view .terminal-screen')];"
+        " const frames = [...document.querySelectorAll('#windows-view iframe')];"
+        " return screens.length > 0 && screens.every(screen => screen.dataset.ready)"
+        " && frames.every(frame => frame.contentDocument && frame.contentDocument.readyState === 'complete'); })()",
+        "Promise.all([...document.querySelectorAll('#windows-view iframe')].map(frame => frame.contentDocument.fonts.ready))",
+    ),
+}
+FREEZE = """*, *::before, *::after {
+  animation: none !important; transition: none !important; caret-color: transparent !important;
+}
+/* Window specimens are wider than the viewport's workspace; unclip their
+   scrolling frames so the full specimen is captured. */
+#windows-view .windows-frame { max-width: none !important; overflow: visible !important; }"""
+
+
+class Unavailable(Exception):
+    pass
+
+
+class Studio:
+    """A private, read-only studio server for captures (or an existing URL)."""
+
+    def __init__(self, url: str | None):
+        self.url, self.process = url, None
+
+    def __enter__(self):
+        if self.url:
+            self._wait(5)
+            return self
+        port = cdp.free_port()
+        self.url = f"http://127.0.0.1:{port}"
+        self.log = tempfile.TemporaryFile()
+        self.process = subprocess.Popen(
+            [sys.executable, str(ROOT / "studio.py"), "--port", str(port),
+             "--source", str(ROOT / "design-system" / "tokens.toml")],
+            stdout=self.log, stderr=subprocess.STDOUT,
+        )
+        self._wait(10)
+        return self
+
+    def _wait(self, timeout):
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                with urllib.request.urlopen(self.url + "/api/state", timeout=2) as response:
+                    response.read()
+                return
+            except OSError as error:
+                if self.process and self.process.poll() is not None:
+                    raise Unavailable(f"studio server exited ({self.process.returncode})") from None
+                if time.monotonic() > deadline:
+                    raise Unavailable(f"studio not reachable at {self.url}: {error}") from None
+                time.sleep(0.1)
+
+    def __exit__(self, *exc):
+        if self.process:
+            self.process.terminate()
+            try:
+                self.process.wait(5)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+                self.process.wait(5)
+            self.log.close()
+
+
+def capture(url: str, directory: pathlib.Path, chromium: str | None, names) -> dict:
+    """Capture the named specimens into `directory`; return capture metadata."""
+    width, height = VIEWPORT
+    browser = cdp.launch(url.rstrip("/") + "/#shell", chromium=chromium, width=width, height=height, scale=1)
+    try:
+        browser.wait("document.querySelectorAll('.token-row').length > 0 && !!document.querySelector('#foundation-grid .foundation-mode')",
+                     "the studio to render", 10)
+        browser.evaluate(f"(() => {{ const style = document.createElement('style'); style.textContent = {json.dumps(FREEZE)};"
+                         " document.head.append(style); })()")
+        version = browser.call("Browser.getVersion").get("product", "unknown")
+        current_view = None
+        for name in names:
+            view, selector = SPECIMENS[name]
+            if view != current_view:
+                browser.evaluate(f"document.querySelector('.tab[data-view=\"{view}\"]').click()")
+                browser.evaluate("window.scrollTo(0, 0)")
+                current_view = view
+                if view in READY:
+                    ready, settle = READY[view]
+                    browser.wait(ready, f"the {view} specimens to load", 10)
+                    browser.evaluate(settle)
+            browser.evaluate("document.fonts.ready.then(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))))")
+            rect = browser.evaluate(f"""(() => {{
+              const node = document.querySelector({json.dumps(selector)});
+              if (!node) return null;
+              const box = node.getBoundingClientRect();
+              return {{ x: Math.round(box.left + scrollX), y: Math.round(box.top + scrollY),
+                        width: Math.round(box.width), height: Math.round(box.height) }};
+            }})()""")
+            if not rect or not rect["width"] or not rect["height"]:
+                raise cdp.CDPError(f"specimen {name} ({selector}) is not rendered")
+            browser.screenshot(directory / f"{name}.png", clip=rect)
+        exceptions = browser.exceptions()
+        if exceptions:
+            raise cdp.CDPError("page exceptions during capture:\n  " + "\n  ".join(exceptions))
+        return {"chromium": version, "viewport": list(VIEWPORT), "deviceScaleFactor": 1}
+    finally:
+        browser.close()
+
+
+def update(args) -> int:
+    with Studio(args.url) as studio:
+        meta = capture(studio.url, BASELINES, args.chromium, args.names)
+    meta["captured"] = time.strftime("%Y-%m-%d")
+    meta["specimens"] = sorted(SPECIMENS)
+    (BASELINES / "meta.json").write_text(json.dumps(meta, indent=2) + "\n")
+    for name in args.names:
+        image = visual.read(BASELINES / f"{name}.png")
+        print(f"wrote {(BASELINES / f'{name}.png').relative_to(ROOT)}  {image.width}×{image.height}")
+    print(f"visual-baseline: {len(args.names)} baseline(s) updated ({meta['chromium']})")
+    return 0
+
+
+def check(args) -> int:
+    diff_dir = pathlib.Path(args.diff_dir) if args.diff_dir else pathlib.Path(tempfile.gettempdir()) / "white-pill-visual"
+    try:
+        meta = json.loads((BASELINES / "meta.json").read_text())
+    except (OSError, ValueError):
+        meta = {}
+    with tempfile.TemporaryDirectory(prefix="white-pill-visual-") as directory, Studio(args.url) as studio:
+        captured = pathlib.Path(directory)
+        current = capture(studio.url, captured, args.chromium, args.names)
+        if meta.get("chromium") and meta["chromium"] != current["chromium"]:
+            print(f"note: baselines were captured with {meta['chromium']}; this is {current['chromium']}")
+        failures = 0
+        width = max(len(name) for name in args.names)
+        for name in args.names:
+            baseline, actual = BASELINES / f"{name}.png", captured / f"{name}.png"
+            if not baseline.exists():
+                failures += 1
+                print(f"FAIL  {name:<{width}}  no baseline (run script/visual-baseline update)")
+                continue
+            if baseline.read_bytes() == actual.read_bytes():
+                image = visual.read(baseline)
+                print(f"ok    {name:<{width}}  identical  {image.width}×{image.height}")
+                continue
+            try:
+                result = visual.compare(visual.read(baseline), visual.read(actual), args.threshold)
+            except visual.PNGError as error:
+                failures += 1
+                print(f"FAIL  {name:<{width}}  {error}")
+                continue
+            summary = (result.size_mismatch or
+                       f"{result.differing} px differ ({result.ratio:.3%}), max Δ {result.max_delta}")
+            if result.size_mismatch or result.ratio > args.tolerance:
+                failures += 1
+                diff_dir.mkdir(parents=True, exist_ok=True)
+                (diff_dir / f"{name}.actual.png").write_bytes(actual.read_bytes())
+                if result.image:
+                    visual.write(diff_dir / f"{name}.diff.png", result.image)
+                print(f"FAIL  {name:<{width}}  {summary} → {diff_dir / name}.diff.png")
+            else:
+                print(f"ok    {name:<{width}}  {summary} (within tolerance {args.tolerance:.3%})")
+    if failures:
+        print(f"visual-baseline: {failures} of {len(args.names)} specimen(s) differ. If the change is intended, "
+              "run script/visual-baseline update and review the PNGs.")
+        return 1
+    print(f"visual-baseline: {len(args.names)} specimen(s) match")
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("command", choices=("update", "check"))
+    parser.add_argument("names", nargs="*", metavar="specimen", help=f"subset of: {', '.join(SPECIMENS)}")
+    parser.add_argument("--url", help="use a running studio instead of starting a private one")
+    parser.add_argument("--chromium", default=cdp.find_chromium())
+    parser.add_argument("--tolerance", type=float, default=0.0,
+                        help="fraction of pixels allowed to differ (default 0)")
+    parser.add_argument("--threshold", type=int, default=0,
+                        help="per-channel difference (0-255) ignored when comparing pixels (default 0)")
+    parser.add_argument("--diff-dir", help="where failing captures and diff images go (default $TMPDIR/white-pill-visual)")
+    parser.add_argument("--skip-if-unavailable", action="store_true",
+                        help="exit 0 with a message when Chromium is not installed")
+    args = parser.parse_args()
+    unknown = [name for name in args.names if name not in SPECIMENS]
+    if unknown:
+        parser.error(f"unknown specimen(s): {', '.join(unknown)}")
+    args.names = args.names or list(SPECIMENS)
+    if not args.chromium:
+        if args.skip_if_unavailable:
+            print("visual-baseline: skipped (no Chromium found; set $CHROMIUM)")
+            return 0
+        print("visual-baseline: no Chromium found (set $CHROMIUM)", file=sys.stderr)
+        return 2
+    try:
+        return update(args) if args.command == "update" else check(args)
+    except (Unavailable, cdp.CDPError, visual.PNGError) as error:
+        print(f"visual-baseline: {error}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

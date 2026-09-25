@@ -1,0 +1,18 @@
+# Consumer repositories that receive generated adapters.
+#
+# Each [[consumer]] names a repository, its root, and the adapter families it
+# receives. `root` expands `~` and `$VAR`; a relative root resolves against
+# this repository. `env` names a variable that overrides the root when set.
+# Display labels in reports and the manifest are `<name>:<path in root>`.
+#
+# Adapter families: omarchy-theme, omarchy-plugin, hyprland, hunk.
+# This repository's own design-system/tokens.css is always generated (as the
+# implicit `studio` consumer).
+#
+# Set WHITE_PILL_CONSUMERS to use a different file.
+
+[[consumer]]
+name = "dotfiles"
+root = "~/.dotfiles"
+env = "WHITE_PILL_DOTFILES"
+adapters = ["omarchy-plugin", "omarchy-theme", "hyprland", "hunk"]

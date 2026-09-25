@@ -1,0 +1,590 @@
+# Canonical Mekanikos tokens. A string starting with "@" references another
+# token by dotted path, e.g. "@palette.light.accent". See README.md.
+
+[meta]
+name = "Mekanikos"
+direction = "Frosted Utility"
+version = 1
+
+[wide-gamut]
+# More saturated than the sRGB fallback while retaining 6.7:1 contrast with
+# white. CSS consumers opt in only when both syntax and a P3 output are present.
+accent = "color(display-p3 0.04 0.30 0.84)"
+
+[palette.dark]
+mode = "dark"
+accent = "#1853C7"
+selection = "#3D4042"
+muted = "#403833"
+background = "#1C1917"
+dark_background = "#171412"
+darker_background = "#100E0D"
+lighter_background = "#25211F"
+foreground = "#B4BDC3"
+dark_foreground = "#6E6763"
+light_foreground = "#C4CACF"
+bright_foreground = "#D4D9DC"
+red = "#DE6E7C"
+yellow = "#B77E64"
+orange = "#D68C67"
+green = "#819B69"
+cyan = "#66A5AD"
+blue = "#6099C0"
+magenta = "#B279A7"
+brown = "#867A74"
+bright_red = "#E8838F"
+bright_yellow = "#D68C67"
+bright_green = "#8BAE68"
+bright_cyan = "#65B8C1"
+bright_blue = "#61ABDA"
+bright_magenta = "#CF86C1"
+
+[palette.light]
+mode = "light"
+accent = "#1853C7"
+selection = "#CBD9E3"
+muted = "#CFC1BA"
+background = "#F0EDEC"
+dark_background = "#E6E1DF"
+darker_background = "#D8D1CE"
+lighter_background = "#F7F5F4"
+foreground = "#2C363C"
+dark_foreground = "#6D7478"
+light_foreground = "#4F5E68"
+bright_foreground = "#182126"
+red = "#A8334C"
+yellow = "#944927"
+orange = "#A85D2D"
+green = "#4F6C31"
+cyan = "#3B8992"
+blue = "#286486"
+magenta = "#88507D"
+brown = "#76523A"
+bright_red = "#94253E"
+bright_yellow = "#803D1C"
+bright_green = "#3F5A22"
+bright_cyan = "#2B747C"
+bright_blue = "#1D5573"
+bright_magenta = "#7B3B70"
+
+[color.dark]
+canvas = "@palette.dark.background"
+surface-raised = "@palette.dark.lighter_background"
+surface-solid = "#262626"
+surface-raised-alpha = 0.86
+surface-alt = "@palette.dark.dark_background"
+text-primary = "@palette.dark.foreground"
+text-secondary = "#8D9499"
+text-muted = "@palette.dark.dark_foreground"
+accent = "@palette.dark.accent"
+focus = "@color.dark.accent"
+danger = "@palette.dark.red"
+success = "@palette.dark.green"
+warning = "@palette.dark.orange"
+info = "@palette.dark.cyan"
+selection = "@palette.dark.selection"
+border-solid = "@palette.dark.muted"
+note-border = "#A1938C"
+diff-add = "#A6B28B"
+diff-delete = "#DCA3A3"
+# Hyprland col.inactive_border rgba(ffffff22): white at 0x22/255, as in light.
+# (Over the dark canvas it composites like the old rgba(55555588).)
+window-border-inactive = "#FFFFFF"
+window-border-inactive-alpha = 0.133
+
+[color.light]
+canvas = "@palette.light.background"
+surface-raised = "#FFFFFF"
+surface-solid = "#FCFBFA"
+surface-raised-alpha = 0.78
+surface-alt = "@palette.light.lighter_background"
+text-primary = "@palette.light.foreground"
+text-secondary = "@palette.light.light_foreground"
+text-muted = "@palette.light.dark_foreground"
+accent = "@palette.light.accent"
+focus = "@color.light.accent"
+danger = "@palette.light.red"
+success = "@palette.light.green"
+warning = "@palette.light.orange"
+info = "@palette.light.cyan"
+selection = "@palette.light.selection"
+border-solid = "@palette.light.muted"
+note-border = "#6A5549"
+diff-add = "#5C6F3E"
+diff-delete = "@color.light.danger"
+# Hyprland col.inactive_border rgba(ffffff22): white at 0x22/255.
+window-border-inactive = "#FFFFFF"
+window-border-inactive-alpha = 0.133
+
+[control.dark]
+primary-background = "@color.dark.accent"
+primary-foreground = "#FFFFFF"
+toggle-on-background = "@color.dark.accent"
+toggle-on-foreground = "@control.dark.primary-foreground"
+slider-fill = "@color.dark.accent"
+focus-ring = "@color.dark.accent"
+selected-fill-alpha = 0.22
+hover-fill-alpha = 0.10
+
+[control.light]
+primary-background = "@color.light.accent"
+primary-foreground = "#FFFFFF"
+toggle-on-background = "@color.light.accent"
+toggle-on-foreground = "@control.light.primary-foreground"
+slider-fill = "@color.light.accent"
+focus-ring = "@color.light.accent"
+selected-fill-alpha = 0.14
+hover-fill-alpha = 0.08
+
+[chrome.dark]
+bar-background-alpha = 0.72
+overlay-background-alpha = 0.86
+scrim-alpha = 0.20
+
+[chrome.light]
+bar-background-alpha = 0.64
+overlay-background-alpha = 0.78
+scrim-alpha = 0.12
+
+[syntax.dark]
+keyword = "@color.dark.text-primary"
+string = "#868C91"
+comment = "@color.dark.text-muted"
+function = "@color.dark.text-primary"
+variable = "#979FA4"
+type = "@color.dark.note-border"
+number = "@syntax.dark.string"
+operator = "@color.dark.text-secondary"
+punctuation = "@palette.dark.brown"
+
+[syntax.light]
+keyword = "@color.light.text-primary"
+string = "#556570"
+comment = "#948985"
+function = "@color.light.text-primary"
+variable = "#44525B"
+type = "@color.light.note-border"
+number = "@syntax.light.string"
+operator = "@color.light.text-secondary"
+punctuation = "#8E817B"
+
+[type]
+ui = "Iosevka Aile"
+ui-strong = "Iosevka Aile"
+bar = "Iosevka Aile"
+mono = "Iosevka Curly"
+base-size = 14
+size-small = 12
+size-body = 14
+size-title = 16
+weight-normal = 400
+weight-medium = 500
+# Popup titles are semibold (see README, "Popup typography"). Qt picks the
+# Inter SemiBold face for 600; 650 would sit between two static faces.
+weight-semibold = 600
+weight-strong = 700
+# Popup titles' slightly tightened tracking, in em (-0.16px at 16px).
+tracking-title = -0.01
+
+[spacing]
+unit = 2
+scale = 1.0
+scale-with-font = false
+control-gap = 8
+control-padding-x = 10
+control-padding-y = 6
+input-padding-y = 7
+control-height = 28
+popup-row-height = 28
+row-gap = 6
+row-padding-x = 10
+label-gap = 4
+popup-padding = 14
+panel-padding = 14
+panel-gap = 10
+osd-padding-x = 20
+osd-padding-y = 10
+
+[radius]
+small = 4
+control = 8
+surface = 14
+full = 999
+
+[border.subtle]
+color = "#808080"
+alpha = 0.28
+width = 0.5
+
+[border.glass]
+color = "#FFFFFF"
+alpha = 0.68
+width = 1.0
+inner-color = "#2C363C"
+inner-alpha = 0.14
+inner-width = 0.5
+
+[border.glass-dark]
+color = "#FFFFFF"
+alpha = 0.22
+width = 1.0
+inner-color = "#FFFFFF"
+inner-alpha = 0.08
+inner-width = 0.5
+
+[shadow.floating]
+color = "#10131A"
+alpha = 0.12
+blur = 18
+x = 0
+y = 4
+
+[shadow.low]
+color = "#10131A"
+alpha = 0.08
+blur = 10
+x = 0
+y = 2
+
+[blur]
+floating = 18
+tooltip = 12
+
+# Tiled application-window geometry, generated into each theme's
+# hyprland_window.lua (general.border_size/gaps_in/gaps_out,
+# decoration.rounding and shadow). Hyprland draws the border inside the
+# window's tile (border_part_of_window = true). gaps-outer-top is 4 because
+# the user's ~/.config/hypr/looknfeel.lua pulls tiled windows up to the bar.
+# Tiled windows cast the floating shadow in both focus states; the border
+# carries focus.
+[window]
+border-width = 4
+gaps-inner = 2
+gaps-outer = 12
+gaps-outer-top = 4
+rounding = "@radius.surface"
+rounding-power = 2
+shadow-color = "@shadow.floating.color"
+shadow-alpha = "@shadow.floating.alpha"
+shadow-alpha-inactive = "@shadow.floating.alpha"
+shadow-range = "@shadow.floating.blur"
+shadow-x = "@shadow.floating.x"
+shadow-y = "@shadow.floating.y"
+
+[motion]
+fast = 120
+standard = 140
+slow = 420
+easing = "out-cubic"
+theme-easing = "in-out-cubic"
+
+# Component recipes
+#
+# Recipes describe UI intent by composing semantic roles and foundations; the
+# adapters in adapters.py map recipe fields onto consumer files. A string that
+# starts with "@" references another token. Inside recipes, "{mode}" resolves
+# to "light" or "dark" for the mode being generated, and a [recipe.<name>.<mode>]
+# table overrides individual fields for that mode only.
+
+[recipe.bar]
+background = "@color.{mode}.surface-raised"
+background-alpha = "@chrome.{mode}.bar-background-alpha"
+text = "@color.{mode}.text-primary"
+active = "@color.{mode}.danger"
+font-family = "@type.bar"
+font-size = "@type.size-body"
+scale-with-font = false
+size-horizontal = 29
+size-vertical = 28
+# shell.json `bar.transparent` (user config, recorded like the window opacity
+# rules): the bar paints no surface, and omarchy-bar-text-color picks `text`
+# or `transparent-text` (the theme background), whichever contrasts more with
+# the wallpaper under the bar.
+transparent = true
+transparent-text = "@color.{mode}.canvas"
+
+# Tiled application windows (Hyprland chrome). active-border and
+# active-border-foreground also feed shell.hyprland.toml; the hyprland adapter
+# writes the rest to each theme's hyprland_window.lua.
+[recipe.window]
+active-border = "@color.{mode}.accent"
+active-border-foreground = "@color.{mode}.text-primary"
+border-width = "@window.border-width"
+inactive-border = "@color.{mode}.window-border-inactive"
+inactive-border-alpha = "@color.{mode}.window-border-inactive-alpha"
+rounding = "@window.rounding"
+rounding-power = "@window.rounding-power"
+gaps-inner = "@window.gaps-inner"
+gaps-outer = "@window.gaps-outer"
+gaps-outer-top = "@window.gaps-outer-top"
+shadow-color = "@window.shadow-color"
+shadow-alpha = "@window.shadow-alpha"
+shadow-alpha-inactive = "@window.shadow-alpha-inactive"
+shadow-range = "@window.shadow-range"
+shadow-x = "@window.shadow-x"
+shadow-y = "@window.shadow-y"
+# Omarchy's default-opacity window rule ("0.985 0.96"); consumer behavior,
+# recorded so the specimen composites like the real desktop.
+opacity-active = 0.985
+opacity-inactive = 0.96
+
+# The dark theme's hyprland.lua drops default-opacity for every window
+# (`o.window(".*", { opacity = "1 1" })`), so dark windows are opaque.
+[recipe.window.dark]
+opacity-active = 1.0
+opacity-inactive = 1.0
+
+# Terminal (ghostty). Colors mirror Omarchy's ghostty.conf template, which
+# renders colors.toml (the palette): ANSI 0/7/8/15 are background/foreground/
+# muted/bright_foreground, selection-foreground is bright_foreground. Every
+# slot is verified against the native capture (script/align-check).
+# Font size, padding, and cursor are the user's own choices. On Linux,
+# ~/.dotfiles/ghostty/linux.config (loaded last) owns the point values: the
+# shared ~/.dotfiles/ghostty/config values × 0.75, because ghostty converts
+# points at 96 dpi here (1pt = 1.333px) but 1pt = 1px on macOS. The recipe
+# records the effective values from `ghostty +show-config` and the grid
+# measured in the native capture. See README.md, "Alignment log".
+[recipe.terminal]
+background = "@palette.{mode}.background"
+foreground = "@palette.{mode}.foreground"
+# The template's cursor is bright_foreground; the user's config overrides it.
+cursor = "#DD0455"
+cursor-text = "#FFFFFF"
+selection = "@palette.{mode}.selection"
+selection-foreground = "@palette.{mode}.bright_foreground"
+font-family = "@type.mono"
+# ghostty font-size is in points (linux.config): 12pt = 16px at 96 dpi.
+font-size = 12
+# ghostty also applies the desktop's GTK text-scaling-factor (1.1818 on this
+# machine, set outside ghostty): 12pt renders at 16 × 1.1818 = 18.9 logical px.
+font-scale = 1.1818
+# adjust-cell-height = 15%: the font's 1.25em line (Iosevka ascent + descent) × 1.15.
+cell-height-adjust = 0.15
+# The resulting grid, measured in the native capture: ghostty renders at
+# buffer scale 2 and rounds to whole device px (37.8px font → 19px cell
+# width, 47.3 × 1.15 → 55px cell height), i.e. 9.5 × 27.5 logical px.
+cell-width = 9.5
+cell-height = 27.5
+# Grid offsets in logical px, measured. ghostty's padding is in points, scaled
+# like the font, and rounded down at buffer scale 2: window-padding-x 6pt →
+# 18.9 → 18 device px = 9; window-padding-y 3,6pt → 9.45 → 9 device px = 4.5.
+padding-x = 9
+padding-top = 4.5
+padding-bottom = 9
+ansi-0 = "@palette.{mode}.background"
+ansi-1 = "@palette.{mode}.red"
+ansi-2 = "@palette.{mode}.green"
+ansi-3 = "@palette.{mode}.yellow"
+ansi-4 = "@palette.{mode}.blue"
+ansi-5 = "@palette.{mode}.magenta"
+ansi-6 = "@palette.{mode}.cyan"
+ansi-7 = "@palette.{mode}.foreground"
+ansi-8 = "@palette.{mode}.muted"
+ansi-9 = "@palette.{mode}.bright_red"
+ansi-10 = "@palette.{mode}.bright_green"
+ansi-11 = "@palette.{mode}.bright_yellow"
+ansi-12 = "@palette.{mode}.bright_blue"
+ansi-13 = "@palette.{mode}.bright_magenta"
+ansi-14 = "@palette.{mode}.bright_cyan"
+ansi-15 = "@palette.{mode}.bright_foreground"
+
+# Browser (Helium, a Chromium fork). Omarchy's chromium.theme template is
+# {{ background_rgb }}: the palette background becomes the BrowserThemeColor
+# policy (`seed`), with BrowserColorScheme "device" (the theme's mode).
+# Chromium builds every chrome tone from that seed with its own colour
+# pipeline, so the tones are measured from native captures, per mode, not
+# palette references: light is neutral (white frame), dark keeps the seed's
+# warm hue. Geometry is Helium's at 1:1 logical px. See README.md,
+# "Alignment log".
+[recipe.browser]
+seed = "@palette.{mode}.background"
+toolbar = "@recipe.browser.frame"
+active-tab = "@recipe.browser.frame"
+font-family = "@type.ui"
+# Chromium's UI font is the GTK font-name, "Inter 11" (11pt = 14.67px), which
+# Chromium rounds to whole px: tab titles are 15px; the omnibox is 1px smaller.
+font-size = 15
+omnibox-font-size = 14
+tab-strip-height = 34
+tab-width = 200
+toolbar-height = 31
+# A 1px transparent line separates the toolbar from the page.
+separator-width = 1
+omnibox-height = 28
+omnibox-radius = 8
+new-tab-height = 28
+new-tab-radius = 8
+# The page sits inside the frame, inset on the left, right, and bottom.
+content-inset = 4
+content-radius = 8
+# Omarchy's chromium-based-browser window rule ("1.0 0.985").
+opacity-active = 1.0
+opacity-inactive = 0.985
+
+[recipe.browser.light]
+frame = "#FFFFFF"
+omnibox = "#E1E1E2"
+new-tab-background = "#E2DDDA"
+text = "#202124"
+text-muted = "#5E5F62"
+icon-disabled = "#9F9FA1"
+caption = "#C2C4C6"
+avatar = "#6A5C53"
+
+[recipe.browser.dark]
+frame = "#443C37"
+omnibox = "#2E2B2B"
+# In dark mode Chromium paints the new-tab button with the seed itself.
+new-tab-background = "@recipe.browser.seed"
+text = "#FFFFFF"
+text-muted = "#9C9B9B"
+icon-disabled = "#95908D"
+caption = "#827E7C"
+avatar = "@recipe.browser.text"
+
+# Floating panels and popups; the OSD and tray popups reuse this surface.
+[recipe.panel]
+background = "@color.{mode}.surface-raised"
+background-alpha = "@color.{mode}.surface-raised-alpha"
+text = "@color.{mode}.text-primary"
+text-secondary = "@color.{mode}.text-secondary"
+shadow-color = "@shadow.floating.color"
+shadow-alpha = "@shadow.floating.alpha"
+shadow-blur = "@shadow.floating.blur"
+shadow-x = "@shadow.floating.x"
+shadow-y = "@shadow.floating.y"
+backdrop-blur = "@blur.floating"
+
+[recipe.panel.light]
+border = "@border.glass.color"
+border-alpha = "@border.glass.alpha"
+border-width = "@border.glass.width"
+inner-border = "@border.glass.inner-color"
+inner-border-alpha = "@border.glass.inner-alpha"
+inner-border-width = "@border.glass.inner-width"
+
+[recipe.panel.dark]
+border = "@border.glass-dark.color"
+border-alpha = "@border.glass-dark.alpha"
+border-width = "@border.glass-dark.width"
+inner-border = "@border.glass-dark.inner-color"
+inner-border-alpha = "@border.glass-dark.inner-alpha"
+inner-border-width = "@border.glass-dark.inner-width"
+
+[recipe.tooltip]
+background = "@recipe.panel.background"
+background-alpha = "@recipe.panel.background-alpha"
+text = "@recipe.panel.text"
+border = "@recipe.panel.border"
+border-alpha = "@recipe.panel.border-alpha"
+border-width = "@recipe.panel.border-width"
+inner-border = "@recipe.panel.inner-border"
+inner-border-alpha = "@recipe.panel.inner-border-alpha"
+inner-border-width = "@recipe.panel.inner-border-width"
+shadow-color = "@recipe.panel.shadow-color"
+shadow-alpha = "@recipe.panel.shadow-alpha"
+shadow-blur = "@recipe.panel.shadow-blur"
+shadow-x = "@recipe.panel.shadow-x"
+shadow-y = "@recipe.panel.shadow-y"
+backdrop-blur = "@blur.tooltip"
+
+# The card pads its content with spacing.popup-padding. Title and body use the
+# popup title and context-subtitle roles (README, "Popup typography").
+[recipe.notification]
+background = "@recipe.panel.background"
+background-alpha = "@recipe.panel.background-alpha"
+text = "@recipe.panel.text"
+text-secondary = "@recipe.panel.text-secondary"
+# mikker.notifications' card width (from upstream omarchy.notifications),
+# shared with its history panel.
+width = 380
+border = "@recipe.panel.border"
+border-alpha = "@recipe.panel.border-alpha"
+border-width = "@recipe.panel.border-width"
+inner-border = "@recipe.panel.inner-border"
+inner-border-alpha = "@recipe.panel.inner-border-alpha"
+inner-border-width = "@recipe.panel.inner-border-width"
+shadow-color = "@recipe.panel.shadow-color"
+shadow-alpha = "@recipe.panel.shadow-alpha"
+shadow-blur = "@recipe.panel.shadow-blur"
+shadow-x = "@recipe.panel.shadow-x"
+shadow-y = "@recipe.panel.shadow-y"
+backdrop-blur = "@recipe.panel.backdrop-blur"
+countdown = "@color.{mode}.accent"
+
+# Volume and playback feedback: panel surface, independent density. One row:
+# an icon glyph (type.mono) in a column as wide as the widest volume glyph's
+# ink, the track, and a readout as wide as "100%" in the popup title role.
+[recipe.osd]
+padding-x = "@spacing.osd-padding-x"
+padding-y = "@spacing.osd-padding-y"
+# Omarchy's display-large at base-size 14 (14 × 2.333); it sets the row height.
+icon-size = 33
+gap = 16
+track = "@color.{mode}.text-primary"
+track-alpha = 0.14
+track-height = 5
+track-length = 142
+track-radius = "@radius.full"
+fill = "@control.{mode}.slider-fill"
+
+# Launcher and menu overlays.
+[recipe.overlay]
+background = "@color.{mode}.surface-raised"
+background-alpha = "@chrome.{mode}.overlay-background-alpha"
+text = "@color.{mode}.text-primary"
+border = "@color.{mode}.accent"
+border-alpha = 1.0
+border-width = 2
+scrim = "@color.{mode}.canvas"
+scrim-alpha = "@chrome.{mode}.scrim-alpha"
+selected-background = "@control.{mode}.primary-background"
+selected-background-alpha = "@control.{mode}.selected-fill-alpha"
+selected-text = "@color.{mode}.text-primary"
+selected-border = "@control.{mode}.focus-ring"
+selected-border-alpha = 0.45
+
+[recipe.controls]
+normal-color = "@color.{mode}.text-primary"
+normal-fill-alpha = 0.04
+normal-border = "@color.{mode}.text-primary"
+normal-border-width = 1
+normal-border-alpha = 0.40
+hover-cursor-color = "@control.{mode}.focus-ring"
+hover-cursor-fill-alpha = "@control.{mode}.hover-fill-alpha"
+hover-cursor-border = "@control.{mode}.focus-ring"
+hover-cursor-border-width = 1
+hover-cursor-border-alpha = 0.45
+focus-color = "@control.{mode}.focus-ring"
+focus-fill-alpha = 0.10
+focus-border = "@control.{mode}.focus-ring"
+focus-border-width = 1
+focus-border-alpha = 1.0
+selected-color = "@control.{mode}.primary-background"
+selected-fill-alpha = "@control.{mode}.selected-fill-alpha"
+selected-border = "@control.{mode}.primary-background"
+selected-border-width = 0
+selected-border-alpha = 1.0
+pressed-fill-alpha = 0.24
+selection-fill-alpha = 0.28
+
+[recipe.code-review]
+accent = "@color.{mode}.accent"
+panel = "@color.{mode}.canvas"
+panel-alt = "@color.{mode}.surface-alt"
+text = "@color.{mode}.text-primary"
+muted = "@color.{mode}.text-muted"
+border = "@color.{mode}.border-solid"
+note-border = "@color.{mode}.note-border"
+add = "@color.{mode}.diff-add"
+delete = "@color.{mode}.diff-delete"
+selection = "@color.{mode}.selection"
+syntax-keyword = "@syntax.{mode}.keyword"
+syntax-string = "@syntax.{mode}.string"
+syntax-comment = "@syntax.{mode}.comment"
+syntax-function = "@syntax.{mode}.function"
+syntax-variable = "@syntax.{mode}.variable"
+syntax-type = "@syntax.{mode}.type"
+syntax-number = "@syntax.{mode}.number"
+syntax-operator = "@syntax.{mode}.operator"
+syntax-punctuation = "@syntax.{mode}.punctuation"

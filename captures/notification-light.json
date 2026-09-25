@@ -1,0 +1,72 @@
+{
+  "surface": "notification",
+  "mode": "light",
+  "date": "2026-09-25T14:01:45+00:00",
+  "image": "notification-light.png",
+  "box": {
+    "x": 2137,
+    "y": 30,
+    "width": 423,
+    "height": 108
+  },
+  "scale": 1.5,
+  "pixels": {
+    "width": 634,
+    "height": 162
+  },
+  "monitor": "DP-2",
+  "method": "omarchy notification send --app-name 'White Pill Fixture' -t 30000 'White Pill capture fixture' \u2026; card located by a background-probe diff inside the fullscreen omarchy-notifications layer; dismissed by summary, then its history entry is removed and trimmed entries are restored",
+  "located_by": "[notifications] background-probe diff inside the omarchy-notifications layer 0,0 2560x1440",
+  "deterministic": true,
+  "live": [],
+  "notes": "",
+  "backdrop": [
+    "helium"
+  ],
+  "versions": {
+    "quickshell": "0.3.1-1",
+    "qt6-base": "6.11.2-3",
+    "hyprland": "0.56.2-2",
+    "grim": "1.5.0-2"
+  },
+  "dotfiles": {
+    "path": "/home/mikker/.dotfiles",
+    "commit": "40522d223cda30487c374687ea630544f38ceef2",
+    "dirty": true
+  },
+  "studio": {
+    "commit": "uncommitted",
+    "tokens_sha256": "c7e3cbc3d0374837fe9c88f2a266eb4e4dbe39b0dfc33070dded371c5652ed23"
+  },
+  "theme": {
+    "user_theme": "Mekanikos Light",
+    "applied": "/home/mikker/.dotfiles/omarchy-themes/mekanikos-light",
+    "colors_sha256": "48593da3a15aea8d25742086a6f7bd49a9bde69d4b10148e36ab5456186e6509",
+    "shell_sha256": "2e41f87a7d8b28dbfbac12121cbdaace17c861204ea929bed92df6d47f09acab"
+  },
+  "font": {
+    "requested": "Inter Medium Tabular",
+    "family": "Inter",
+    "style": "Medium",
+    "file": "/usr/share/fonts/inter/Inter.ttc",
+    "fallback": false
+  },
+  "comparison": {
+    "browser_image": "notification-light.browser.png",
+    "selector": "#shell-view .light-preview .notification-specimen",
+    "clip": {
+      "x": 539.3333740234375,
+      "y": 469.3333435058594,
+      "width": 428,
+      "height": 116.66667175292969
+    },
+    "device_scale": 1.5,
+    "result": {
+      "metric": "RMSE",
+      "absolute": 18770.8,
+      "normalized": 0.286424,
+      "note": "Browser specimen resized to the native pixel size; backdrops differ, so treat as a trend."
+    },
+    "date": "2026-09-25T14:08:34+00:00"
+  }
+}

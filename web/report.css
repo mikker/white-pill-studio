@@ -1,0 +1,101 @@
+/* Change report modal ------------------------------------------------- */
+
+.change-report {
+  position: fixed;
+  z-index: 60;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(37, 48, 56, .22);
+  backdrop-filter: blur(3px);
+}
+
+.report-dialog {
+  width: min(760px, 100%);
+  max-height: min(820px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(44, 54, 60, .16);
+  border-radius: 14px;
+  background: rgba(252, 251, 250, .97);
+  box-shadow: 0 30px 80px -28px rgba(16, 19, 26, .45), 0 2px 6px rgba(16, 19, 26, .06);
+}
+
+.report-head { display: flex; align-items: start; justify-content: space-between; gap: 12px; padding: 16px 16px 13px 20px; border-bottom: 1px solid var(--studio-line); }
+.report-head h2 { margin: 0 0 3px; font-size: 16px; font-weight: 650; }
+.report-head p { margin: 0; color: var(--studio-muted); font: 11px var(--studio-mono); }
+.report-head .icon-button { width: 28px; min-height: 28px; flex: none; font-size: 16px; }
+
+.report-body { overflow-y: auto; padding: 4px 20px 18px; scrollbar-width: thin; }
+.report-section { padding-top: 14px; }
+.report-section h3 { display: flex; justify-content: space-between; margin: 0 0 7px; color: var(--studio-muted); font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; }
+.report-section h3 span { font: 400 10px var(--studio-mono); letter-spacing: 0; text-transform: none; }
+
+.report-tokens { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.report-token {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 7px 10px;
+  border: 1px solid var(--studio-line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .7);
+}
+.report-path { min-width: 0; overflow: hidden; font: 11px var(--studio-mono); text-overflow: ellipsis; white-space: nowrap; }
+.report-resolved { grid-column: 1 / -1; display: flex; align-items: center; justify-content: end; gap: 8px; color: var(--studio-muted); }
+.report-resolved small { font: 9px var(--studio-mono); text-transform: uppercase; letter-spacing: .04em; }
+
+.report-change { display: inline-flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; }
+.report-arrow { color: var(--studio-muted); font-size: 11px; }
+.report-chip { display: inline-flex; align-items: center; gap: 5px; max-width: 260px; min-width: 0; }
+.report-chip code { overflow: hidden; font: 10px var(--studio-mono); text-overflow: ellipsis; white-space: nowrap; }
+.report-chip.is-old code { color: var(--studio-muted); text-decoration: line-through; text-decoration-color: rgba(109, 116, 120, .45); }
+.report-chip.is-new code { color: var(--studio-text); font-weight: 600; }
+.report-swatch { width: 13px; height: 13px; flex: none; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(44, 54, 60, .22); }
+.report-modes { display: inline-flex; gap: 8px; }
+.report-mode { display: inline-flex; align-items: center; gap: 4px; }
+.report-mode small { color: var(--studio-muted); font: 8px var(--studio-mono); text-transform: uppercase; }
+
+.report-consumer { display: grid; gap: 6px; margin-bottom: 12px; }
+.report-consumer-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.report-consumer-head strong { font-size: 13px; font-weight: 650; }
+.report-consumer-head code { min-width: 0; overflow: hidden; color: var(--studio-muted); font: 10px var(--studio-mono); text-overflow: ellipsis; white-space: nowrap; }
+.report-consumer-head span { margin-left: auto; flex: none; color: var(--studio-muted); font: 10px var(--studio-mono); }
+
+.report-target { overflow: hidden; border: 1px solid var(--studio-line); border-radius: 10px; background: rgba(255, 255, 255, .62); }
+.report-target > summary { min-height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 11px; cursor: pointer; list-style: none; }
+.report-target > summary::-webkit-details-marker { display: none; }
+.report-target > summary::before { content: "▸"; flex: none; color: var(--studio-muted); font-size: 10px; }
+.report-target[open] > summary::before { transform: rotate(90deg); }
+.report-target[open] > summary { border-bottom: 1px solid var(--studio-line); }
+.report-target > summary:hover { background: rgba(44, 54, 60, .025); }
+.report-file { min-width: 0; overflow: hidden; font: 11px var(--studio-mono); text-overflow: ellipsis; white-space: nowrap; }
+.report-count { margin-left: auto; flex: none; color: var(--studio-muted); font: 10px var(--studio-mono); }
+.report-mode-tag { flex: none; padding: 1px 6px; border-radius: 4px; font: 600 9px/1.5 var(--studio-mono); text-transform: uppercase; }
+.report-mode-tag.is-light { background: white; box-shadow: inset 0 0 0 1px var(--studio-line); }
+.report-mode-tag.is-dark { background: #25211f; color: #c4cacf; }
+.report-fields { width: 100%; border-collapse: collapse; }
+.report-fields td { padding: 5px 11px; border-top: 1px solid rgba(44, 54, 60, .07); vertical-align: middle; }
+.report-fields tr:first-child td { border-top: 0; }
+.report-fields td:first-child { width: 42%; }
+.report-fields td:first-child code { font: 10px var(--studio-mono); }
+.report-empty { margin: 0; color: var(--studio-muted); font-size: 12px; }
+
+.report-issues ul { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.report-issues li { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: baseline; gap: 8px; padding: 6px 9px; border-radius: 8px; font-size: 12px; }
+.report-issues li b { font: 600 9px var(--studio-mono); text-transform: uppercase; }
+.report-issues li code { font: 10px var(--studio-mono); }
+.report-issues li.is-warning { background: rgba(168, 93, 45, .08); color: #7d4520; }
+.report-issues li.is-error { background: rgba(168, 51, 76, .08); color: #94253e; }
+
+.report-foot { display: flex; justify-content: end; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--studio-line); background: rgba(248, 247, 245, .9); }
+
+@media (max-width: 760px) {
+  .change-report { padding: 8px; }
+  .report-token { grid-template-columns: 1fr; }
+  .report-resolved { justify-content: start; }
+  .report-fields td:first-child { width: auto; }
+}

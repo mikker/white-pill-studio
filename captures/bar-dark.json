@@ -1,0 +1,75 @@
+{
+  "surface": "bar",
+  "mode": "dark",
+  "date": "2026-09-25T13:27:58+00:00",
+  "image": "bar-dark.png",
+  "box": {
+    "x": 0,
+    "y": 0,
+    "width": 2560,
+    "height": 29
+  },
+  "scale": 1.5,
+  "pixels": {
+    "width": 3840,
+    "height": 43
+  },
+  "monitor": "DP-2",
+  "method": "grim of the omarchy-bar layer box (best effort: content is the live session)",
+  "located_by": "hyprctl layers (omarchy-bar)",
+  "deterministic": false,
+  "live": [
+    "clock",
+    "workspaces",
+    "tray",
+    "indicators"
+  ],
+  "notes": "Clock, workspaces, tray, and indicators show live session state. Freezing the clock requires writing ~/.config/omarchy/shell.json (a dotfiles symlink), which the harness does not do.",
+  "backdrop": [],
+  "versions": {
+    "quickshell": "0.3.1-1",
+    "qt6-base": "6.11.2-3",
+    "hyprland": "0.56.2-2",
+    "grim": "1.5.0-2"
+  },
+  "dotfiles": {
+    "path": "/home/mikker/.dotfiles",
+    "commit": "40522d223cda30487c374687ea630544f38ceef2",
+    "dirty": true
+  },
+  "studio": {
+    "commit": "uncommitted",
+    "tokens_sha256": "f9f893fd60b208cd669073cfa505cb715c785ce8e0da681090ba381dc43c8a4a"
+  },
+  "theme": {
+    "user_theme": "Mekanikos Light",
+    "applied": "/home/mikker/.dotfiles/omarchy-themes/mekanikos",
+    "colors_sha256": "9426db62441a3c1d8be8c6425b12ea601098af7f49f4ce250e18890ea6c06aec",
+    "shell_sha256": "a7b6db020f986fa894b760ec9345a3fa9ccfcee9cecd4886cc870f7547f45cd2"
+  },
+  "font": {
+    "requested": "Inter Medium Tabular",
+    "family": "Inter",
+    "style": "Medium",
+    "file": "/usr/share/fonts/inter/Inter.ttc",
+    "fallback": false
+  },
+  "comparison": {
+    "browser_image": "bar-dark.browser.png",
+    "selector": "#windows-view .desktop-specimen.dark-preview .menubar",
+    "clip": {
+      "x": 630.6666870117188,
+      "y": 954.6666870117188,
+      "width": 1280,
+      "height": 14.5
+    },
+    "device_scale": 3.0,
+    "result": {
+      "metric": "RMSE",
+      "absolute": 6669.93,
+      "normalized": 0.101777,
+      "note": "Browser specimen resized to the native pixel size; backdrops differ, so treat as a trend."
+    },
+    "date": "2026-09-25T13:28:03+00:00"
+  }
+}

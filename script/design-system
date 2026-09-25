@@ -1,0 +1,382 @@
+#!/usr/bin/env python3
+"""Generate, check, validate, describe, report on, release, and export Mekanikos design tokens."""
+
+import argparse
+import json
+import pathlib
+import shutil
+import subprocess
+import sys
+import tomllib
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+import adapters  # noqa: E402
+import report as change_report  # noqa: E402
+import tokens_model  # noqa: E402
+
+DEFAULT_SOURCE = ROOT / "design-system" / "tokens.toml"
+
+
+class Context:
+    """The token source, its studio root, and the configured consumers (raises ConsumerError)."""
+
+    def __init__(self, source: pathlib.Path):
+        self.source = source
+        self.root = tokens_model.project_root(source)
+        self.consumers = adapters.load_consumers(self.root)
+
+    def display(self, path) -> str:
+        return adapters.display_path(path, self.consumers)
+
+
+def print_issues(issues, stream):
+    for item in issues:
+        print(tokens_model.format_issue(item), file=stream)
+
+
+def validated(context, raw):
+    """Print issues; return False when any are errors."""
+    issues = tokens_model.validate(raw)
+    errors = tokens_model.errors(issues)
+    print_issues(issues, sys.stderr)
+    if errors:
+        print(f"{len(errors)} validation error(s) in {context.source}", file=sys.stderr)
+    return not errors
+
+
+def missing_roots(context) -> list:
+    """Error lines for consumers whose root does not exist."""
+    lines = []
+    for consumer in context.consumers:
+        if not consumer.root.is_dir():
+            hint = f"edit {adapters.consumers_path(context.root)}"
+            if consumer.origin not in ("config", "default", "studio"):  # the root came from this env var
+                hint = f"set {consumer.origin} or {hint}"
+            lines.append(f"consumer {consumer.name!r}: root {consumer.root} does not exist ({hint})")
+    return lines
+
+
+def expected_outputs(context, raw):
+    try:
+        return adapters.outputs(raw, context.consumers)
+    except tokens_model.TokenError as error:
+        print(f"Cannot generate: {error}", file=sys.stderr)
+        return None
+
+
+def generate(context, expected) -> int:
+    problems = missing_roots(context)
+    if problems:
+        for line in problems:
+            print(f"Cannot generate: {line}", file=sys.stderr)
+        return 1
+    for path, content in expected.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+        print(context.display(path))
+    return 0
+
+
+def check(context, expected) -> int:
+    """Verify every consumer repository; print one status line per consumer."""
+    by_consumer = {consumer.name: [] for consumer in context.consumers}
+    for target in adapters.targets(context.consumers):
+        by_consumer[target.consumer].append(target.path)
+    width = max(len(name) for name in by_consumer)
+    failed = False
+    stale_lines = []
+    for consumer in context.consumers:
+        paths = by_consumer[consumer.name]
+        label = f"{consumer.name:<{width}}  {consumer.root}"
+        if not consumer.root.is_dir():
+            failed = True
+            print(f"{label}  missing root", file=sys.stderr)
+            continue
+        stale = [path for path in paths if not path.exists() or path.read_text() != expected[path]]
+        if stale:
+            failed = True
+            print(f"{label}  {len(stale)} of {len(paths)} file(s) stale", file=sys.stderr)
+            stale_lines += [f"  {context.display(path)}" for path in stale]
+        else:
+            print(f"{label}  current ({len(paths)} file{'s' if len(paths) != 1 else ''})")
+    for line in missing_roots(context):
+        print(f"Error: {line}", file=sys.stderr)
+    if stale_lines:
+        print("Generated design-system files are stale:", file=sys.stderr)
+        for line in stale_lines:
+            print(line, file=sys.stderr)
+        print("Run: script/design-system generate", file=sys.stderr)
+    if failed:
+        return 1
+    print("Design-system outputs are current")
+    return 0
+
+
+def consumers_command(context, as_json: bool) -> int:
+    config = adapters.consumers_path(context.root)
+    rows = []
+    for consumer in context.consumers:
+        exists = consumer.root.is_dir()
+        rows.append({**consumer.to_json(), "exists": exists,
+                     "git": adapters.git_state(consumer.root) if exists else None})
+    if as_json:
+        json.dump({"config": str(config), "consumers": rows}, sys.stdout, indent=2)
+        print()
+        return 0
+    print(f"Consumer configuration: {config}{'' if config.is_file() else ' (missing; using the default)'}")
+    width = max(len(row["name"]) for row in rows)
+    for row in rows:
+        git = row["git"]
+        if not row["exists"]:
+            state = "MISSING"
+        elif git is None:
+            state = "not a git repository"
+        else:
+            state = f"git {git['head'] or '(no commits)'}{' dirty' if git['dirty'] else ' clean'}"
+        origin = "" if row["origin"] in ("config", "studio") else f"  [root from {row['origin']}]"
+        print(f"  {row['name']:<{width}}  {row['root']}  {state}  ←  {', '.join(row['adapters'])}{origin}")
+    return 1 if any(not row["exists"] for row in rows) else 0
+
+
+def read_changes(args) -> dict:
+    changes = {}
+    if args.changes:
+        text = sys.stdin.read() if args.changes == "-" else pathlib.Path(args.changes).read_text()
+        document = json.loads(text)
+        changes = document.get("changes", document) if isinstance(document, dict) else document
+        if not isinstance(changes, dict):
+            raise ValueError("Changes file must hold a JSON object of token path → value")
+    for item in args.set or []:
+        path, value = change_report.parse_assignment(item)
+        changes[path] = value
+    return changes
+
+
+def report_command(context, raw, args) -> int:
+    import studio  # the same change preparation the studio's /api/report uses
+
+    try:
+        changes = read_changes(args)
+        _, draft = studio.prepare_changes(raw, changes)
+    except (OSError, ValueError, studio.StudioError) as error:
+        print(f"Cannot report: {error}", file=sys.stderr)
+        return 1
+    result = change_report.change_report(raw, draft, context.consumers)
+    if args.json:
+        json.dump(result, sys.stdout, indent=2, ensure_ascii=False)
+        print()
+    else:
+        print(change_report.format_report(result))
+    return 1 if tokens_model.errors(result["issues"]) else 0
+
+
+def git(root, *args) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, check=False)
+
+
+def parse_version(text: str):
+    text = text.removeprefix("v")
+    try:
+        value = json.loads(text)
+    except json.JSONDecodeError:
+        value = text
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        raise ValueError(f"Invalid version {text!r}")
+    return value
+
+
+def version_problem(current, version, text: str) -> str | None:
+    """Why `version` cannot replace the current [meta] version, or None."""
+    numeric = tokens_model.is_number(current) and tokens_model.is_number(version)
+    if type(current) is not type(version) and not numeric:
+        return f"[meta] version is {current!r}; {text!r} must be the same type"
+    if isinstance(current, int) and not isinstance(version, int):
+        return f"[meta] version is an integer; use an integer such as {current + 1}"
+    if numeric and version < current:
+        return f"version {version} is older than the current {current}"
+    return None
+
+
+def tag_problem(root, tag: str, current, version) -> str | None:
+    """Why `tag` cannot be created at HEAD of `root` yet, or None."""
+    if version != current:
+        return (f"[meta] version is {current}, not {version}. Run script/design-system release "
+                f"{version} (without --tag), commit the bump, then tag.")
+    if git(root, "rev-parse", "--verify", "HEAD").returncode:
+        return f"{root} has no commits"
+    if git(root, "status", "--porcelain").stdout.strip():
+        return f"{root} has uncommitted changes"
+    if git(root, "rev-parse", "--verify", "--quiet", f"refs/tags/{tag}").returncode == 0:
+        return f"{tag} already exists"
+    return None
+
+
+def release_command(context, raw, args) -> int:
+    import studio  # reuse the studio's line-preserving TOML update
+
+    try:
+        version = parse_version(args.version)
+    except ValueError as error:
+        print(f"Cannot release: {error}", file=sys.stderr)
+        return 1
+    current = raw.get("meta", {}).get("version")
+    tag = f"design-system/v{version}"
+    problem = version_problem(current, version, args.version)
+    if problem:
+        print(f"Cannot release: {problem}", file=sys.stderr)
+        return 1
+    if args.tag:
+        problem = tag_problem(context.root, tag, current, version)
+        if problem:
+            print(f"Cannot tag: {problem}", file=sys.stderr)
+            return 1
+
+    if not validated(context, raw):
+        return 1
+    expected = expected_outputs(context, raw)
+    if expected is None:
+        return 1
+    print("Checking consumers before release")
+    if check(context, expected):
+        print("Cannot release: consumer outputs are stale or missing; run script/design-system generate first",
+              file=sys.stderr)
+        return 1
+
+    if version != current:
+        try:
+            studio.update_source(context.source, {"meta.version": version})
+        except studio.StudioError as error:
+            print(f"Cannot release: {error}", file=sys.stderr)
+            return 1
+        print(f"Bumped [meta] version {current} → {version} in {context.source}")
+        raw = tokens_model.load(context.source)
+        expected = expected_outputs(context, raw)
+        if expected is None or generate(context, expected):
+            return 1
+        if check(context, expected):
+            return 1
+    else:
+        print(f"[meta] version is already {version}")
+
+    if args.tag:  # tag_problem saw a clean tree at this version, and nothing since has written
+        result = git(context.root, "tag", tag)
+        if result.returncode:
+            print(f"git tag failed: {result.stderr.strip()}", file=sys.stderr)
+            return 1
+        print(f"Tagged {tag} at {git(context.root, 'rev-parse', '--short', 'HEAD').stdout.strip()}")
+        print(f"Push it with: git push origin {tag}")
+        return 0
+
+    source = context.source.relative_to(context.root) if context.source.is_relative_to(context.root) else context.source
+    dirty = git(context.root, "status", "--porcelain").stdout.strip()
+    print()
+    print("To tag this revision:")
+    if version != current or dirty:
+        print(f"  git -C {context.root} add {source} design-system/tokens.css")
+        print(f"  git -C {context.root} commit -m 'Design system v{version}'")
+    print(f"  git -C {context.root} tag {tag}")
+    print(f"or, once committed: script/design-system release {version} --tag")
+    for consumer in context.consumers[1:]:
+        state = adapters.git_state(consumer.root)
+        if state:
+            print(f"Consumer {consumer.name} is at {state['head'] or '(no commits)'}"
+                  f"{' with uncommitted changes' if state['dirty'] else ''}; commit regenerated files there separately.")
+    return 0
+
+
+def export_command(context, directory: pathlib.Path) -> int:
+    """Write a static, read-only copy of the studio: web/, api/*.json, and captures."""
+    import captures  # the same payloads the studio's GET routes serve
+    import studio
+
+    try:
+        state = studio.studio_state(context.source)
+    except studio.StudioError as error:
+        print(f"Cannot export: {error}", file=sys.stderr)
+        return 1
+    shutil.copytree(studio.WEB_ROOT, directory, dirs_exist_ok=True)
+    api = directory / "api"
+    api.mkdir(exist_ok=True)
+    captures_dir = context.root / "captures"
+    # The snapshot is meant to be published, so paths under the exporting
+    # user's home are written as ~/... rather than leaking the account name.
+    home = str(pathlib.Path.home())
+    for name, payload in (("state.json", state), ("captures.json", captures.list_captures(captures_dir))):
+        (api / name).write_text(json.dumps(payload, ensure_ascii=False).replace(home, "~"))
+    copied = [path for pattern in ("*.png", "*.json") for path in sorted(captures_dir.glob(pattern)) if path.is_file()]
+    if copied:
+        (directory / "captures").mkdir(exist_ok=True)
+        for path in copied:
+            shutil.copy2(path, directory / "captures" / path.name)
+    (directory / ".nojekyll").write_text("")
+    print(f"Exported the studio to {directory} ({len(copied)} capture file{'' if len(copied) == 1 else 's'})")
+    return 0
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Generate and validate Mekanikos design tokens")
+    parser.add_argument("--source", type=pathlib.Path, default=DEFAULT_SOURCE,
+                        help="canonical TOML token file (default: design-system/tokens.toml)")
+    commands = parser.add_subparsers(dest="command", required=True, metavar="command")
+    commands.add_parser("generate", help="validate, then regenerate studio CSS and every consumer's adapters")
+    commands.add_parser("check", help="validate and detect output drift in every consumer repository")
+    commands.add_parser("validate", help="list validation issues")
+    commands.add_parser("manifest", help="print every generated target and field as JSON")
+    consumers = commands.add_parser("consumers", help="print the resolved consumer configuration")
+    consumers.add_argument("--json", action="store_true")
+    reporting = commands.add_parser("report", help="describe what a set of token changes would regenerate")
+    reporting.add_argument("changes", nargs="?", help="JSON file of {path: value} (or {\"changes\": {...}}); - for stdin")
+    reporting.add_argument("--set", action="append", metavar="PATH=VALUE", help="a token change (repeatable)")
+    reporting.add_argument("--json", action="store_true", help="print the report as JSON")
+    release = commands.add_parser("release", help="bump [meta] version, regenerate, and print (or run) the tag")
+    release.add_argument("version")
+    release.add_argument("--tag", action="store_true", help="run git tag (requires a clean, committed repository)")
+    export = commands.add_parser("export", help="write a static, read-only copy of the studio (e.g. for GitHub Pages)")
+    export.add_argument("directory", type=pathlib.Path)
+    args = parser.parse_args()
+
+    source = args.source.resolve()
+    try:
+        raw = tokens_model.load(source)
+    except (OSError, tomllib.TOMLDecodeError) as error:
+        print(f"Unable to read {source}: {error}", file=sys.stderr)
+        return 1
+    try:
+        context = Context(source)
+    except adapters.ConsumerError as error:
+        print(f"Invalid consumer configuration: {error}", file=sys.stderr)
+        return 1
+
+    if args.command == "manifest":
+        json.dump(adapters.manifest(raw, context.root, context.consumers), sys.stdout, indent=2, ensure_ascii=False)
+        print()
+        return 0
+    if args.command == "consumers":
+        return consumers_command(context, args.json)
+    if args.command == "validate":
+        issues = tokens_model.validate(raw)
+        print_issues(issues, sys.stdout)
+        errors = len(tokens_model.errors(issues))
+        print(f"{errors} error(s), {len(issues) - errors} warning(s)")
+        return 1 if errors else 0
+    if args.command == "report":
+        return report_command(context, raw, args)
+    if args.command == "release":
+        return release_command(context, raw, args)
+    if args.command == "export":
+        return export_command(context, args.directory.resolve())
+
+    if not validated(context, raw):
+        return 1
+    expected = expected_outputs(context, raw)
+    if expected is None:
+        return 1
+    if args.command == "generate":
+        return generate(context, expected)
+    return check(context, expected)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

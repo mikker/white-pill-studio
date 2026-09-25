@@ -1,0 +1,294 @@
+{
+  "surface": "terminal",
+  "mode": "light",
+  "date": "2026-09-25T13:57:19+00:00",
+  "image": "terminal-light.png",
+  "box": {
+    "x": 12,
+    "y": 33,
+    "width": 1266,
+    "height": 1395
+  },
+  "scale": 1.5,
+  "pixels": {
+    "width": 1899,
+    "height": 2092
+  },
+  "monitor": "WHITEPILL-CAPTURE",
+  "method": "crop of the windows capture: the ghostty client box from `hyprctl clients -j`, grown by border_size",
+  "located_by": "hyprctl clients -j (com.mitchellh.ghostty) grown by border_size",
+  "deterministic": true,
+  "live": [],
+  "notes": "ghostty runs the user's real config chain (~/.config/ghostty/config, which includes ~/.dotfiles/ghostty/config last) with only the theme include swapped for the mode's ghostty.conf; the effective values (font, size, padding, cell height, cursor color) are in the metadata.",
+  "backdrop": [],
+  "versions": {
+    "quickshell": "0.3.1-1",
+    "qt6-base": "6.11.2-3",
+    "hyprland": "0.56.2-2",
+    "grim": "1.5.0-2"
+  },
+  "dotfiles": {
+    "path": "/home/mikker/.dotfiles",
+    "commit": "40522d223cda30487c374687ea630544f38ceef2",
+    "dirty": true
+  },
+  "studio": {
+    "commit": "uncommitted",
+    "tokens_sha256": "dc7de0dc105bdd2c2c2962b1baa60ce75fcf4ce336107b1ade9d9268d3ae4ddf"
+  },
+  "theme": {
+    "user_theme": "Mekanikos Light",
+    "applied": "/home/mikker/.dotfiles/omarchy-themes/mekanikos-light",
+    "colors_sha256": "48593da3a15aea8d25742086a6f7bd49a9bde69d4b10148e36ab5456186e6509",
+    "shell_sha256": "1a6e7906c9d57b4507ea48e9c1a5eb6278d2736026a91c68545aaff6db16ec56"
+  },
+  "font": {
+    "requested": "Inter Medium Tabular",
+    "family": "Inter",
+    "style": "Medium",
+    "file": "/usr/share/fonts/inter/Inter.ttc",
+    "fallback": false
+  },
+  "output": {
+    "name": "WHITEPILL-CAPTURE",
+    "headless": true,
+    "size": [
+      3840,
+      2160
+    ],
+    "scale": 1.5,
+    "workspace": 3,
+    "reserved": [
+      0,
+      29,
+      0,
+      0
+    ]
+  },
+  "hyprland": {
+    "general:border_size": 4,
+    "general:gaps_in": 2,
+    "general:gaps_out": {
+      "top": 4,
+      "right": 12,
+      "bottom": 12,
+      "left": 12
+    },
+    "general:col.active_border": "rgba(1853c7ff)",
+    "general:col.inactive_border": "rgba(ffffff22)",
+    "general:layout": "dwindle",
+    "decoration:rounding": 14,
+    "decoration:rounding_power": 2.0,
+    "decoration:border_part_of_window": true,
+    "decoration:dim_inactive": false,
+    "decoration:shadow:enabled": true,
+    "decoration:shadow:range": 18,
+    "decoration:shadow:render_power": 2,
+    "decoration:shadow:sharp": false,
+    "decoration:shadow:color": "rgba(10131a1f)",
+    "decoration:shadow:color_inactive": "rgba(10131a1f)",
+    "decoration:shadow:offset": [
+      0,
+      4
+    ],
+    "decoration:shadow:scale": 1.0
+  },
+  "theme_delta": {},
+  "theme_delta_skipped": [],
+  "window_props_set": {
+    "terminal": {
+      "opacity": "0.985",
+      "opacity_inactive": "0.985",
+      "inactive_border_color": "rgba(1853c7ff)"
+    },
+    "browser": {
+      "opacity": "1.0",
+      "opacity_inactive": "0.985"
+    }
+  },
+  "windows": {
+    "terminal": {
+      "class": "com.mitchellh.ghostty",
+      "at": [
+        20016,
+        37
+      ],
+      "size": [
+        1258,
+        1387
+      ],
+      "box": {
+        "x": 12,
+        "y": 33,
+        "width": 1266,
+        "height": 1395
+      },
+      "props": {
+        "opacity": "0.985",
+        "opacity_inactive": "0.985",
+        "active_border_color": "ff1853c7 0deg",
+        "inactive_border_color": "ff1853c7 0deg",
+        "rounding": "14"
+      }
+    },
+    "browser": {
+      "class": "helium",
+      "at": [
+        21286,
+        37
+      ],
+      "size": [
+        1258,
+        1387
+      ],
+      "box": {
+        "x": 1282,
+        "y": 33,
+        "width": 1266,
+        "height": 1395
+      },
+      "props": {
+        "opacity": "1",
+        "opacity_inactive": "0.985",
+        "active_border_color": "ff1853c7 0deg",
+        "inactive_border_color": "22ffffff 0deg",
+        "rounding": "14"
+      }
+    }
+  },
+  "ghostty": {
+    "version": "Ghostty 1.3.1-arch2",
+    "config": "~/.config/ghostty/config chain with the theme include swapped for the mode's ghostty.conf",
+    "flags": [
+      "--gtk-single-instance=false",
+      "--quit-after-last-window-closed=true",
+      "--linux-cgroup=never",
+      "--shell-integration=none",
+      "--app-notifications=false",
+      "--title=White Pill terminal fixture"
+    ],
+    "effective": {
+      "font-family": [
+        "Iosevka Nerd Font Mono",
+        "IBM Plex Mono"
+      ],
+      "font-style": "Regular",
+      "adjust-cell-height": "14.999999999999991%",
+      "window-padding-x": "6",
+      "window-padding-y": "3,6",
+      "window-colorspace": "display-p3",
+      "window-theme": "ghostty",
+      "theme": "light:Zenbones Light,dark:Zenbones Dark",
+      "background": "#f0edec",
+      "foreground": "#2c363c",
+      "cursor-style-blink": "false",
+      "cursor-color": "#dd0455",
+      "cursor-text": "#ffffff",
+      "selection-background": "#cbd9e3",
+      "selection-foreground": "#182126",
+      "palette": [
+        "0=#f0edec",
+        "1=#a8334c",
+        "2=#4f6c31",
+        "3=#944927",
+        "4=#286486",
+        "5=#88507d",
+        "6=#3b8992",
+        "7=#2c363c",
+        "8=#cfc1ba",
+        "9=#94253e",
+        "10=#3f5a22",
+        "11=#803d1c",
+        "12=#1d5573",
+        "13=#7b3b70",
+        "14=#2b747c",
+        "15=#182126"
+      ],
+      "gtk-toolbar-style": "flat"
+    },
+    "theme_sha256": "b8e7e474b305e267224d785373651df1ec201e70a0dedea55f8d0cb8e3a18292",
+    "fonts": [
+      {
+        "requested": "Iosevka Nerd Font Mono",
+        "family": "Iosevka Nerd Font Mono",
+        "style": "Regular",
+        "file": "/usr/share/fonts/TTF/IosevkaNerdFontMono-Regular.ttf",
+        "fallback": false
+      },
+      {
+        "requested": "IBM Plex Mono",
+        "family": "Iosevka Nerd Font Mono",
+        "style": "Regular",
+        "file": "/usr/share/fonts/TTF/IosevkaNerdFontMono-Regular.ttf",
+        "fallback": true
+      }
+    ],
+    "script": "captures/fixtures/terminal.sh",
+    "transcript": "web/fixtures/terminal-session.ans",
+    "transcript_sha256": "06868b0250bc18958b52aa1a9873cc2b348c024694f56d6fcb0bb33a3954dbb6",
+    "cursor": "hidden (the script prints DECTCEM hide) so no cursor cell differs between runs"
+  },
+  "browser": {
+    "name": "Helium",
+    "command": "helium-browser",
+    "version": "Chrome/154.0.8037.57",
+    "package": "helium-browser-bin 0.18.1.1-1",
+    "flags": [
+      "--no-first-run",
+      "--no-default-browser-check",
+      "--password-store=basic",
+      "--disable-sync",
+      "--hide-crash-restore-bubble",
+      "--window-size=1264,1387"
+    ],
+    "page": {
+      "url": "http://127.0.0.1:4777/fixtures/browser-page.html?scheme=light",
+      "source": "studio"
+    },
+    "chrome": {
+      "policy": "/etc/chromium/policies/managed/color.json",
+      "theme_color": "#f0edec",
+      "color_scheme": "light",
+      "follows_mode": true,
+      "method": "the browser runs in its own user+mount namespace (unshare, no fork, so Hyprland's launch rule still matches its pid) where a per-capture copy of the managed policy directory is bind-mounted over /etc/chromium/policies/managed; the machine policy is never written",
+      "machine_policy": {
+        "theme_color": "#f0edec",
+        "color_scheme": "device"
+      },
+      "note": "BrowserThemeColor is this mode's chromium.theme (the template renders the palette background, as omarchy-theme-set-browser would). Omarchy writes BrowserColorScheme \"device\", and omarchy-theme-set-gnome sets the device scheme from the theme's mode, so the override states that mode explicitly."
+    }
+  },
+  "restore": [
+    "restored cursor:inactive_timeout=0 after hiding the pointer during grim (verified)",
+    "closed terminal fixture (pid 570734, SIGTERM)",
+    "closed browser fixture (pid 570959, SIGTERM)",
+    "removed the throwaway browser profile",
+    "removed headless output WHITEPILL-CAPTURE (its in-memory monitor rule stays until the next Hyprland reload and matches only that name)",
+    "focus untouched (fixture windows opened silently)"
+  ],
+  "crop_of": "windows-light.png",
+  "crop_pixels": {
+    "x": 18,
+    "y": 49,
+    "width": 1899,
+    "height": 2092
+  },
+  "comparison": {
+    "browser_image": "terminal-light.browser.png",
+    "selector": "#windows-view .desktop-specimen.light-preview .hypr-window.is-terminal",
+    "clip": {
+      "x": 636.6666870117188,
+      "y": 192.5,
+      "width": 633,
+      "height": 697.5
+    },
+    "device_scale": 3.0,
+    "result": {
+      "metric": "RMSE",
+      "absolute": 2849.76,
+      "normalized": 0.0434845,
+      "note": "Browser specimen resized to the native pixel size; backdrops differ, so treat as a trend."
+    },
+    "date": "2026-09-25T14:01:42+00:00"
+  }
+}

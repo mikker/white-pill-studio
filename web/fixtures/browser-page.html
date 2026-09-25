@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Mekanikos</title>
+  <!--
+    Fixed browser fixture. The studio's Windows view embeds this page in an
+    iframe and the native capture loads it in Helium from
+    http://127.0.0.1:4777/fixtures/browser-page.html, so both render the same
+    document. The colors mirror design-system/tokens.toml (color.<mode>.canvas,
+    surface-raised, text-primary, text-secondary, accent, and palette blue for
+    links); they are copied because the studio serves only web/. Keep them in
+    sync by hand; the page is a fixture, not a token consumer.
+
+    The scheme follows prefers-color-scheme; ?scheme=light|dark forces one
+    through data-theme (the studio's light and dark specimens use it).
+  -->
+  <script>
+    (() => {
+      const scheme = new URLSearchParams(location.search).get("scheme");
+      if (scheme === "light" || scheme === "dark") document.documentElement.dataset.theme = scheme;
+    })();
+  </script>
+  <style>
+    :root {
+      color-scheme: light;
+      --canvas: #F0EDEC;
+      --surface-raised: #FFFFFF;
+      --text: #2C363C;
+      --secondary: #4F5E68;
+      --accent: #1853C7;
+      --link: #286486;
+      --edge: rgba(44, 54, 60, .14);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        color-scheme: dark;
+        --canvas: #1C1917;
+        --surface-raised: #25211F;
+        --text: #B4BDC3;
+        --secondary: #8D9499;
+        --accent: #1853C7;
+        --link: #6099C0;
+        --edge: rgba(255, 255, 255, .08);
+      }
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --canvas: #1C1917;
+      --surface-raised: #25211F;
+      --text: #B4BDC3;
+      --secondary: #8D9499;
+      --accent: #1853C7;
+      --link: #6099C0;
+      --edge: rgba(255, 255, 255, .08);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      min-height: 100vh;
+      background: var(--canvas);
+      color: var(--text);
+      font: 14px/1.5 Inter, sans-serif;
+      font-synthesis: none;
+      -webkit-font-smoothing: antialiased;
+    }
+    main { width: 520px; padding: 48px 40px; }
+    h1 { margin: 0 0 12px; font-size: 32px; font-weight: 650; line-height: 1.1; letter-spacing: -.02em; }
+    p { margin: 0 0 24px; color: var(--secondary); }
+    .actions { display: flex; align-items: center; gap: 20px; margin-bottom: 32px; }
+    button {
+      height: 32px;
+      padding: 0 14px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #FFFFFF;
+      font: 500 14px Inter, sans-serif;
+    }
+    a { color: var(--link); text-underline-offset: 3px; }
+    .swatches { display: flex; gap: 12px; }
+    .swatch {
+      width: 96px;
+      height: 64px;
+      display: flex;
+      align-items: end;
+      padding: 8px;
+      border: 1px solid var(--edge);
+      border-radius: 8px;
+      font-size: 12px;
+    }
+    .swatch.canvas { background: var(--canvas); }
+    .swatch.surface { background: var(--surface-raised); }
+    .swatch.accent { background: var(--accent); color: #FFFFFF; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Mekanikos</h1>
+    <p>A restrained system should still feel alive. Canvas, raised surfaces, and one blue accent carry every interface from the shell to the browser.</p>
+    <div class="actions">
+      <button type="button">Primary action</button>
+      <a href="#tokens">Read the tokens</a>
+    </div>
+    <div class="swatches" aria-label="Color roles">
+      <div class="swatch canvas">canvas</div>
+      <div class="swatch surface">surface</div>
+      <div class="swatch accent">accent</div>
+    </div>
+  </main>
+</body>
+</html>

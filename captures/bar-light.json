@@ -1,0 +1,57 @@
+{
+  "surface": "bar",
+  "mode": "light",
+  "date": "2026-09-25T20:42:40+00:00",
+  "image": "bar-light.png",
+  "box": {
+    "x": 0,
+    "y": 0,
+    "width": 2560,
+    "height": 29
+  },
+  "scale": 1.5,
+  "pixels": {
+    "width": 3840,
+    "height": 43
+  },
+  "monitor": "DP-2",
+  "method": "grim of the omarchy-bar layer box (best effort: content is the live session)",
+  "located_by": "hyprctl layers (omarchy-bar)",
+  "deterministic": false,
+  "live": [
+    "clock",
+    "workspaces",
+    "tray",
+    "indicators"
+  ],
+  "notes": "Clock, workspaces, tray, and indicators show live session state. Freezing the clock requires writing ~/.config/omarchy/shell.json (a dotfiles symlink), which the harness does not do.",
+  "backdrop": [],
+  "versions": {
+    "quickshell": "0.3.1-1",
+    "qt6-base": "6.11.2-3",
+    "hyprland": "0.56.2-2",
+    "grim": "1.5.0-2"
+  },
+  "dotfiles": {
+    "path": "/home/mikker/.dotfiles",
+    "commit": "40522d223cda30487c374687ea630544f38ceef2",
+    "dirty": true
+  },
+  "studio": {
+    "commit": "uncommitted",
+    "tokens_sha256": "8939c31d473f55206411f37df83c16a8c3fd3b0907b5163476856c6851037641"
+  },
+  "theme": {
+    "user_theme": "Mekanikos",
+    "applied": "/home/mikker/.dotfiles/omarchy-themes/mekanikos-light",
+    "colors_sha256": "48593da3a15aea8d25742086a6f7bd49a9bde69d4b10148e36ab5456186e6509",
+    "shell_sha256": "39f903d74691a0e7989eed9d8e4ae69109b8c89372d724c75f0b1f9f11f297b8"
+  },
+  "font": {
+    "requested": "Iosevka",
+    "family": "Iosevka",
+    "style": "Regular",
+    "file": "/usr/share/fonts/TTF/Iosevka-Regular.ttc",
+    "fallback": false
+  }
+}

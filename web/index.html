@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>White Pill Studio</title>
+  <link rel="stylesheet" href="studio.css">
+  <link rel="stylesheet" href="report.css">
+  <link rel="stylesheet" href="captures.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='10' width='26' height='12' rx='6' fill='%23fff' stroke='%232c363c' stroke-opacity='.3' transform='rotate(-14 16 16)'/%3E%3Cpath d='M16 10h7a6 6 0 0 1 0 12h-7z' fill='%231853c7' transform='rotate(-14 16 16)'/%3E%3C/svg%3E">
+</head>
+<body>
+  <header class="studio-header">
+    <a class="wordmark" href="#shell" aria-label="White Pill Studio home">
+      <span class="pill-mark" aria-hidden="true"></span>
+      <span>White Pill</span>
+    </a>
+
+    <nav class="view-tabs" aria-label="Specimens">
+      <button class="tab is-active" data-view="shell">Shell</button>
+      <button class="tab" data-view="hunk">Hunk</button>
+      <button class="tab" data-view="windows">Windows</button>
+      <button class="tab" data-view="foundations">Foundations</button>
+      <button class="tab" data-view="adapters">Adapters</button>
+      <button class="tab" data-view="captures">Captures</button>
+    </nav>
+
+    <div class="header-actions">
+      <button id="issue-summary" class="issue-summary" type="button" title="" hidden></button>
+      <span id="save-state" class="save-state">Loading…</span>
+      <button id="save" class="button">Save &amp; generate</button>
+      <button id="apply" class="button button-primary">Apply</button>
+    </div>
+  </header>
+  <div id="snapshot-banner" class="snapshot-banner" role="status" hidden></div>
+
+  <main class="studio-layout">
+    <aside class="inspector">
+      <div class="inspector-head">
+        <div>
+          <h1>Token inspector</h1>
+          <p id="source-path">Connecting to source…</p>
+        </div>
+        <button id="reset" class="icon-button" title="Discard unsaved changes" aria-label="Discard unsaved changes">↺</button>
+      </div>
+      <label class="search">
+        <span aria-hidden="true">⌕</span>
+        <input id="token-search" type="search" placeholder="Filter tokens" autocomplete="off">
+      </label>
+      <div id="general-issues" class="general-issues" hidden></div>
+      <div id="token-groups" class="token-groups"></div>
+    </aside>
+
+    <aside id="provenance" class="provenance" aria-label="Token provenance" hidden>
+      <div class="provenance-head">
+        <button id="provenance-back" class="icon-button" type="button" title="Back" aria-label="Back to previous token" hidden>←</button>
+        <div class="provenance-heading">
+          <div><span id="provenance-layer" class="layer-tag"></span><h3 id="provenance-title"></h3></div>
+          <code id="provenance-path"></code>
+        </div>
+        <button id="provenance-close" class="icon-button" type="button" title="Close (Esc)" aria-label="Close provenance">×</button>
+      </div>
+      <div id="provenance-body" class="provenance-body"></div>
+    </aside>
+
+    <section class="workspace">
+      <div class="workspace-toolbar">
+        <div>
+          <h2 id="view-title">Shell specimens</h2>
+          <p id="view-description">Fast reconstructions driven directly by canonical tokens.</p>
+        </div>
+        <div class="mode-toggle" role="group" aria-label="Preview mode">
+          <button data-mode="light">Light</button>
+          <button data-mode="both" class="is-active">Both</button>
+          <button data-mode="dark">Dark</button>
+        </div>
+      </div>
+
+      <div id="notice" class="notice" hidden></div>
+
+      <section id="shell-view" class="view is-active" aria-label="Shell specimens">
+        <div class="preview-grid">
+          <article class="preview-frame" data-preview-mode="light">
+            <div class="frame-label"><span>Light</span><span>live specimen</span></div>
+            <div class="desktop light-preview" data-fill="shell"></div>
+          </article>
+
+          <article class="preview-frame" data-preview-mode="dark">
+            <div class="frame-label"><span>Dark</span><span>live specimen</span></div>
+            <div class="desktop dark-preview" data-fill="shell"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="hunk-view" class="view" aria-label="Hunk specimens">
+        <div class="preview-grid">
+          <article class="preview-frame" data-preview-mode="light">
+            <div class="frame-label"><span>Light</span><span>Hunk adapter</span></div>
+            <div class="hunk-window light-preview" data-fill="hunk"></div>
+          </article>
+          <article class="preview-frame" data-preview-mode="dark">
+            <div class="frame-label"><span>Dark</span><span>Hunk adapter</span></div>
+            <div class="hunk-window dark-preview" data-fill="hunk"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="windows-view" class="view" aria-label="Window specimens">
+        <div class="windows-stack">
+          <article class="preview-frame windows-frame" data-preview-mode="light">
+            <div class="frame-label"><span>Light</span><span>tiled desktop · 2560×1440 logical at ½</span></div>
+            <div class="desktop-specimen light-preview">
+              <div class="desktop-stage" data-fill="desktop-stage"></div>
+            </div>
+          </article>
+          <article class="preview-frame windows-frame" data-preview-mode="dark">
+            <div class="frame-label"><span>Dark</span><span>tiled desktop · 2560×1440 logical at ½</span></div>
+            <div class="desktop-specimen dark-preview">
+              <div class="desktop-stage" data-fill="desktop-stage"></div>
+            </div>
+          </article>
+          <h3 class="windows-row-title">Terminal <span>ghostty · active window · 1:1 logical px</span></h3>
+          <article class="preview-frame windows-frame" data-preview-mode="light">
+            <div class="frame-label"><span>Light</span><span>ghostty · 100×28 cell fixture</span></div>
+            <div class="window-stage terminal-stage light-preview">
+              <div class="hypr-window is-terminal is-active"><div class="terminal-specimen" data-fill="terminal"></div></div>
+            </div>
+          </article>
+          <article class="preview-frame windows-frame" data-preview-mode="dark">
+            <div class="frame-label"><span>Dark</span><span>ghostty · 100×28 cell fixture</span></div>
+            <div class="window-stage terminal-stage dark-preview">
+              <div class="hypr-window is-terminal is-active"><div class="terminal-specimen" data-fill="terminal"></div></div>
+            </div>
+          </article>
+          <h3 class="windows-row-title">Browser <span>Helium · inactive window · 1:1 logical px</span></h3>
+          <article class="preview-frame windows-frame" data-preview-mode="light">
+            <div class="frame-label"><span>Light</span><span>Helium · fixtures/browser-page.html</span></div>
+            <div class="window-stage browser-stage light-preview">
+              <div class="hypr-window is-browser"><div class="browser-specimen" data-fill="browser"></div></div>
+            </div>
+          </article>
+          <article class="preview-frame windows-frame" data-preview-mode="dark">
+            <div class="frame-label"><span>Dark</span><span>Helium · fixtures/browser-page.html</span></div>
+            <div class="window-stage browser-stage dark-preview">
+              <div class="hypr-window is-browser"><div class="browser-specimen" data-fill="browser"></div></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="foundations-view" class="view" aria-label="Foundation specimens">
+        <div id="foundation-grid" class="foundation-grid"></div>
+        <div class="type-sheet">
+          <p class="type-title">A restrained system should still feel alive.</p>
+          <p class="type-body">Inter carries interface language. Iosevka is reserved for code, metadata, and deliberate machine texture.</p>
+          <p class="type-small">Small · Body · Title · 12 / 14 / 16</p>
+          <p class="type-mono">MON 14:32 · 0123456789 · radius.surface</p>
+        </div>
+      </section>
+
+      <section id="adapters-view" class="view" aria-label="Adapter manifest">
+        <div class="adapter-toolbar">
+          <span id="adapter-summary" class="adapter-summary"></span>
+          <button id="copy-manifest" class="button" type="button">Copy manifest JSON</button>
+        </div>
+        <div id="adapter-groups" class="adapter-groups"></div>
+      </section>
+
+      <section id="captures-view" class="view" aria-label="Native captures">
+        <div class="capture-toolbar">
+          <span id="capture-summary" class="adapter-summary">Loading captures…</span>
+          <code class="capture-command">script/capture run --surface all --mode both</code>
+        </div>
+        <div id="capture-groups" class="capture-groups"></div>
+      </section>
+    </section>
+  </main>
+
+  <div id="change-report" class="change-report" hidden></div>
+
+  <!-- Specimen markup shared by the light and dark previews; studio.js fills each [data-fill] host. -->
+  <template id="shell-template">
+    <div class="menubar" data-fill="menubar"></div>
+    <div class="wallpaper-glow glow-one"></div>
+    <div class="wallpaper-glow glow-two"></div>
+    <div class="floating-surface tooltip-specimen">Applications</div>
+    <div class="floating-surface panel-specimen">
+      <div class="panel-hero">
+        <div class="hero-icon">⌁</div>
+        <div><strong>Audio</strong><small>Murmur</small></div>
+        <button class="switch is-on" aria-label="Audio enabled"><span></span></button>
+      </div>
+      <div class="panel-section">
+        <div class="section-label"><span>Output</span><span>25%</span></div>
+        <div class="range-track"><span style="width:25%"></span><i style="left:25%"></i></div>
+        <div class="device-row"><span>▣</span><span>EVO4</span></div>
+        <div class="device-row is-selected"><span>▣</span><span>USB Audio DAC</span><b>✓</b></div>
+        <div class="device-row"><span>▭</span><span>PG27UCDM</span></div>
+      </div>
+      <div class="panel-section">
+        <div class="section-label"><span>Input</span><span>100%</span></div>
+        <div class="range-track"><span style="width:100%"></span><i style="left:100%"></i></div>
+        <div class="device-row is-selected"><span>MIC</span><span>EVO4</span><b>✓</b></div>
+      </div>
+    </div>
+    <div class="floating-surface notification-specimen">
+      <div><strong>White Pill capture fixture</strong><small>Deterministic notification used for native reference captures.</small></div>
+    </div>
+    <div class="floating-surface osd-specimen">
+      <span class="osd-icon" aria-hidden="true">&#xf027;</span><div class="osd-track" role="presentation"><i></i></div><b class="osd-value"><span aria-hidden="true">100%</span><span>50%</span></b>
+    </div>
+  </template>
+
+  <template id="menubar-template">
+    <div class="bar-cluster"><span class="brand-glyph" aria-hidden="true">&#xe900;</span><span class="workspace active-workspace" aria-label="Workspace 1"></span><span class="workspace">2</span><span class="workspace is-empty">3</span><span class="workspace is-empty">4</span><span class="workspace is-empty">5</span></div>
+    <div class="bar-cluster"><span>EN</span><span>NET</span><span>VOL</span><span>Monday 14:32</span></div>
+  </template>
+
+  <template id="hunk-template">
+    <div class="hunk-sidebar">
+      <strong>Review</strong><span class="muted">3 files</span>
+      <div class="file is-current"><span>●</span> studio.css <b>+18</b></div>
+      <div class="file"><span>●</span> tokens.toml <b>+2</b></div>
+      <div class="file"><span>●</span> PLAN.md <b>+84</b></div>
+    </div>
+    <div class="diff"><div class="diff-head"><strong>web/studio.css</strong><span>1 / 3</span></div><pre><span class="context">  .floating-surface {</span>
+<span class="delete">-   border: 1px solid #ddd;</span>
+<span class="add">+   border: var(--glass-border);</span>
+<span class="add">+   backdrop-filter: blur(var(--blur));</span>
+<span class="context">    border-radius: var(--radius);</span>
+<span class="context">  }</span></pre><div class="review-note"><b>Agent note</b><p>The surface now uses the shared glass recipe.</p></div></div>
+  </template>
+
+  <template id="desktop-stage-template">
+    <div class="menubar" data-fill="menubar"></div>
+    <div class="wallpaper-glow glow-one"></div>
+    <div class="wallpaper-glow glow-two"></div>
+    <div class="tiled-windows">
+      <div class="hypr-window is-terminal is-active"><div class="terminal-specimen" data-fill="terminal"></div></div>
+      <div class="hypr-window is-browser"><div class="browser-specimen" data-fill="browser"></div></div>
+    </div>
+  </template>
+
+  <template id="terminal-template">
+    <pre class="terminal-screen" aria-label="Terminal fixture"></pre>
+  </template>
+
+  <template id="browser-template">
+    <!-- Helium's chrome at 1:1 logical px (measured from captures/browser-<mode>.png):
+         one tab, new-tab button, window close; back/forward/reload, omnibox, and
+         profile/menu. The user's live extension icons are left out; their slots stay
+         empty so the omnibox keeps its width. -->
+    <div class="browser-chrome">
+      <div class="browser-tab is-active">
+        <svg class="browser-icon browser-favicon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7.3"/><path class="browser-globe-lines" d="M.9 8h14.2M8 .9c-3.4 3.6-3.4 10.6 0 14.2M8 .9c3.4 3.6 3.4 10.6 0 14.2M2.2 4.2h11.6M2.2 11.8h11.6"/></svg>
+        <span class="browser-tab-title">Mekanikos</span>
+        <svg class="browser-icon browser-tab-close" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.8 4.8l6.4 6.4M11.2 4.8l-6.4 6.4"/></svg>
+      </div>
+      <span class="browser-new-tab" aria-hidden="true"><svg class="browser-icon" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></svg></span>
+      <svg class="browser-icon browser-caption-close" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+      <svg class="browser-icon browser-back is-disabled" viewBox="0 0 16 16" aria-hidden="true"><path d="M14.2 8H2.4M7.4 3 2.4 8l5 5"/></svg>
+      <svg class="browser-icon browser-forward is-disabled" viewBox="0 0 16 16" aria-hidden="true"><path d="M1.8 8h11.8M8.6 3l5 5-5 5"/></svg>
+      <svg class="browser-icon browser-reload" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.2 8.6A5.4 5.4 0 1 1 11.6 4.3"/><path class="is-filled" d="M14.6 1.4v5h-5z"/></svg>
+      <div class="browser-omnibox">
+        <svg class="browser-icon browser-site-info" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.1"/><path d="M8 7.2v4"/><circle class="is-filled" cx="8" cy="5" r=".9"/></svg>
+        <span class="browser-url"></span>
+        <svg class="browser-icon browser-star" viewBox="0 0 16 16" aria-hidden="true"><path d="m8 1.9 1.8 3.9 4.2.5-3.1 2.9.8 4.2L8 11.3l-3.7 2.1.8-4.2L2 6.3l4.2-.5z"/></svg>
+      </div>
+      <svg class="browser-icon browser-profile" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9"/><circle cx="10" cy="7.6" r="3"/><path d="M4.4 16.2c1.2-2.3 3.2-3.4 5.6-3.4s4.4 1.1 5.6 3.4"/></svg>
+      <svg class="browser-icon browser-menu" viewBox="0 0 16 16" aria-hidden="true"><circle class="is-filled" cx="8" cy="3.2" r="1.5"/><circle class="is-filled" cx="8" cy="8" r="1.5"/><circle class="is-filled" cx="8" cy="12.8" r="1.5"/></svg>
+    </div>
+    <div class="browser-body">
+      <iframe class="browser-content" data-src="fixtures/browser-page.html" title="Browser fixture page" tabindex="-1"></iframe>
+    </div>
+  </template>
+
+  <script src="studio.js" defer></script>
+  <script src="report.js" defer></script>
+  <script src="captures.js" defer></script>
+</body>
+</html>

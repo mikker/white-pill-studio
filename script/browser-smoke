@@ -1,0 +1,351 @@
+#!/usr/bin/env python3
+"""Drive a running White Pill Studio in headless Chromium and assert the core loop works.
+
+Uses the Chrome DevTools Protocol over a raw stdlib websocket; no dependencies.
+Never saves: it only edits the in-browser draft and resets it.
+
+    script/browser-smoke [--url http://127.0.0.1:4777] [--chromium chromium]
+    script/browser-smoke --static             # export, serve under a subpath, check the snapshot
+    script/browser-smoke --static-url URL     # check an already served static export
+
+The static checks cover the read-only snapshot that `script/design-system export`
+writes for GitHub Pages: served from a path prefix, with no backend.
+"""
+
+from __future__ import annotations
+
+import argparse
+import contextlib
+import json
+import pathlib
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.request
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+import cdp  # noqa: E402
+
+
+class SmokeFailure(Exception):
+    pass
+
+
+class Tools:
+    """browser-smoke's vocabulary over cdp.Browser; protocol errors become SmokeFailure."""
+
+    def __init__(self, browser: cdp.Browser):
+        self.browser = browser
+
+    def js(self, expression: str):
+        try:
+            return self.browser.evaluate(expression)
+        except cdp.CDPError as error:
+            raise SmokeFailure(str(error)) from None
+
+    def wait(self, expression: str, what: str, timeout: float = 4.0):
+        try:
+            return self.browser.wait(expression, what, timeout)
+        except cdp.CDPError as error:
+            raise SmokeFailure(str(error)) from None
+
+    def exceptions(self) -> list[str]:
+        return self.browser.exceptions()
+
+
+def set_input(path: str, value: str) -> str:
+    return f"""(() => {{
+      const input = document.querySelector('input[data-path="{path}"]:not([type=color])');
+      if (!input) return false;
+      input.focus();
+      input.value = {json.dumps(value)};
+      input.dispatchEvent(new Event("input", {{ bubbles: true }}));
+      input.blur();
+      return true;
+    }})()"""
+
+
+def check(condition, message: str) -> None:
+    if not condition:
+        raise SmokeFailure(message)
+
+
+def rgb(color: str) -> str:
+    return "rgb({}, {}, {})".format(*(int(color[index:index + 2], 16) for index in (1, 3, 5)))
+
+
+ACCENT = "getComputedStyle(document.querySelector('.{mode}-preview .active-workspace')).color"
+ACCENT_INPUT = "document.querySelector('input[data-path=\"color.light.accent\"]:not([type=color])')"
+
+
+def check_loads(tools: Tools, clean: str) -> str:
+    rows = tools.wait("document.querySelectorAll('.token-row').length", "token rows to render", 8)
+    tools.wait(f"document.querySelector('#save-state').textContent === {json.dumps(clean)}", "clean save state")
+    errors = tools.exceptions()
+    check(not errors, "Console exceptions on load:\n  " + "\n  ".join(errors))
+    return f"loads with {rows} token rows and no exceptions"
+
+
+def check_accent_edit(tools: Tools) -> dict:
+    """Edit color.light.accent; return what reset must restore."""
+    before = {"light": tools.js(ACCENT.format(mode="light")), "dark": tools.js(ACCENT.format(mode="dark"))}
+    original = tools.js(f"{ACCENT_INPUT}?.value")
+    check(original is not None, "No text input for color.light.accent")
+    probe = "#A8334C" if original.upper() != "#A8334C" else "#2B747C"
+    check(tools.js(set_input("color.light.accent", probe)), "Could not edit color.light.accent")
+    light_after = tools.js(ACCENT.format(mode="light"))
+    check(light_after == rgb(probe), f"Light preview accent did not follow the edit: {before['light']} -> {light_after}")
+    check(tools.js(ACCENT.format(mode="dark")) == before["dark"], "Editing the light accent changed the dark preview")
+    check("unsaved" in tools.js("document.querySelector('#save-state').textContent"), "Edit did not mark the draft dirty")
+    return {"original": original, "probe": probe, "light": before["light"]}
+
+
+def check_windows(tools: Tools) -> str:
+    tools.js("document.querySelector('.tab[data-view=\"windows\"]').click()")
+    windows = tools.wait("""(() => {
+      const view = document.querySelector('#windows-view.is-active');
+      const screen = view && view.querySelector('.terminal-stage.light-preview .terminal-screen[data-ready]');
+      const desktop = view && view.querySelector('.desktop-specimen.light-preview');
+      if (!screen || !desktop) return null;
+      const box = desktop.getBoundingClientRect();
+      const page = view.querySelector('.browser-stage.light-preview iframe').contentDocument;
+      return { text: screen.textContent, width: Math.round(box.width), height: Math.round(box.height),
+               windows: desktop.querySelectorAll('.hypr-window').length,
+               page: page && page.readyState === 'complete' ? page.querySelector('h1')?.textContent : null,
+               background: getComputedStyle(screen.parentElement).backgroundColor };
+    })()""", "the Windows view to render the terminal fixture", 6)
+    for line in ("~/dev/white-pill-studio  main*", "$ git status --short", "Design-system outputs are current"):
+        check(line in windows["text"], f"Terminal specimen is missing fixture line {line!r}")
+    check((windows["width"], windows["height"], windows["windows"]) == (1280, 720, 2),
+          f"Desktop specimen should be 1280×720 with two windows: {windows}")
+    check(windows["page"] == "Mekanikos", f"Browser specimen did not load the fixture page: {windows['page']!r}")
+    background = tools.js("document.querySelector('input[data-path=\"palette.light.background\"]:not([type=color])')?.value")
+    check(windows["background"] == rgb(background),
+          f"Terminal background {windows['background']} does not follow palette.light.background {background}")
+    return "windows tab renders the tiled desktop, terminal fixture, and browser page"
+
+
+def check_adapters(tools: Tools) -> str:
+    tools.js("document.querySelector('.tab[data-view=\"adapters\"]').click()")
+    targets = tools.wait("document.querySelectorAll('#adapters-view .adapter-target').length", "adapter targets")
+    return f"adapters tab renders {targets} targets"
+
+
+def check_reset(tools: Tools, edit: dict, clean: str) -> str:
+    tools.js("document.querySelector('#reset').click()")
+    check(tools.js("document.querySelector('#save-state').textContent") == clean, "Reset did not clear the draft")
+    check(tools.js(f"{ACCENT_INPUT}.value") == edit["original"], "Reset did not restore color.light.accent")
+    check(tools.js(ACCENT.format(mode="light")) == edit["light"], "Reset did not restore the light preview")
+    return "reset clears the draft"
+
+
+def check_no_exceptions(tools: Tools) -> None:
+    errors = tools.exceptions()
+    check(not errors, "Console exceptions during the run:\n  " + "\n  ".join(errors))
+
+
+@contextlib.contextmanager
+def studio_page(url: str, binary: str | None):
+    try:
+        browser = cdp.launch(url, chromium=binary)
+    except cdp.CDPError as error:
+        raise SmokeFailure(str(error)) from None
+    try:
+        yield Tools(browser)
+    finally:
+        browser.close()
+
+
+def run_live(url: str, binary: str | None) -> list[str]:
+    passed = []
+    clean = "Source is current"
+    with studio_page(url.rstrip("/") + "/#shell", binary) as tools:
+        passed.append(check_loads(tools, clean))
+        edit = check_accent_edit(tools)
+        passed.append("light accent edit updates the light preview only")
+
+        check(tools.js(set_input("color.light.accent", "#12")), "Could not enter an invalid color")
+        tools.wait("""!!document.querySelector('.token-row[data-path="color.light.accent"].has-error')""",
+                   "an error mark on color.light.accent")
+        check(tools.js("document.querySelector('#save').disabled && document.querySelector('#apply').disabled"),
+              "Save/Apply stay enabled with a validation error")
+        summary = tools.js("document.querySelector('#issue-summary').textContent")
+        check("error" in summary, f"Header issue summary does not count errors: {summary!r}")
+        passed.append(f"invalid color is marked and blocks saving ({summary})")
+
+        linked = tools.js("document.querySelector('.token-row.is-linked')?.dataset.path")
+        check(linked, "No linked (reference) token rows in the inspector")
+        tools.js(f"""document.querySelector('.token-row[data-path="{linked}"] .provenance-button').click()""")
+        hops = tools.wait("!document.querySelector('#provenance').hidden && document.querySelectorAll('#provenance button.hop').length",
+                          f"provenance chain for {linked}")
+        passed.append(f"provenance for {linked} lists {hops} chain hop(s)")
+        tools.js("document.querySelector('#provenance-close').click()")
+
+        passed.append(check_windows(tools))
+        passed.append(check_adapters(tools))
+
+        # The change report must appear before anything is written. Writes are
+        # blocked at the fetch level first, so a missing modal cannot save.
+        tools.js("""(() => {
+          const original = window.fetch;
+          window.__smokeBlocked = [];
+          window.fetch = (input, init) => {
+            const path = String(input && input.url || input);
+            if (/api\\/(save|apply|generate)/.test(path)) {
+              window.__smokeBlocked.push(path);
+              return Promise.reject(new Error("browser-smoke blocks writes"));
+            }
+            return original(input, init);
+          };
+        })()""")
+        check(tools.js(set_input("color.light.accent", edit["probe"])), "Could not re-enter a valid accent")
+        tools.wait("!document.querySelector('#save').disabled", "Save to re-enable after a valid edit")
+        tools.js("document.querySelector('#save').click()")
+        report = tools.wait("""(() => {
+          const dialog = document.querySelector('#change-report:not([hidden]) .report-dialog');
+          if (!dialog) return null;
+          return { summary: dialog.querySelector('.report-head p').textContent,
+                   tokens: dialog.querySelectorAll('.report-token').length,
+                   files: dialog.querySelectorAll('.report-target').length,
+                   swatches: dialog.querySelectorAll('.report-token .report-swatch').length };
+        })()""", "the change report modal", 6)
+        check(report["tokens"] == 1 and report["files"] > 0 and report["swatches"] >= 2,
+              f"Change report is incomplete: {report}")
+        tools.js("document.querySelector('#change-report [data-report=cancel]').click()")
+        tools.wait("document.querySelector('#change-report').hidden", "the change report to close")
+        check(tools.js("window.__smokeBlocked.length") == 0, "Cancelling the change report still tried to write")
+        check("unsaved" in tools.js("document.querySelector('#save-state').textContent"),
+              "Cancelling the change report lost the draft")
+        passed.append(f"change report lists {report['summary']} and cancels without writing")
+
+        passed.append(check_reset(tools, edit, clean))
+        tools.wait("!document.querySelector('.token-row.is-changed') && !document.querySelector('.token-row[data-path=\"color.light.accent\"].has-error')"
+                   " && !document.querySelector('#save').disabled", "reset to clear marks and re-enable Save")
+        check_no_exceptions(tools)
+    return passed
+
+
+def run_static(url: str, binary: str | None) -> list[str]:
+    passed = []
+    clean = "Read-only snapshot"
+    backend_calls = """performance.getEntriesByType('resource').map(entry => new URL(entry.name).pathname)
+      .filter(path => /api\\/(validate|report|save|apply|captures\\/run)$/.test(path))"""
+    with studio_page(url.rstrip("/") + "/#shell", binary) as tools:
+        passed.append(check_loads(tools, clean))
+        banner = tools.js("(() => { const banner = document.querySelector('#snapshot-banner');"
+                          " return banner.hidden || !banner.offsetHeight ? null : banner.textContent; })()")
+        check(banner and "Read-only snapshot" in banner, f"No read-only banner: {banner!r}")
+        check(tools.js("[...document.querySelectorAll('#save, #apply')].every(button => button.hidden && !button.offsetParent)"),
+              "Save & generate and Apply are still shown in a static snapshot")
+        passed.append(f"read-only banner shown and Save/Apply hidden ({banner.strip()!r})")
+
+        edit = check_accent_edit(tools)
+        tools.js("new Promise(done => setTimeout(done, 500))")  # past the live-validation debounce
+        calls = tools.js(backend_calls)
+        check(not calls, f"The snapshot called backend endpoints: {calls}")
+        check(tools.js("document.querySelector('#issue-summary').hidden"), "Validation state shown without a backend")
+        passed.append("light accent edit recolors the light preview locally, without validation requests")
+
+        passed.append(check_windows(tools))
+        passed.append(check_adapters(tools))
+
+        tools.js("document.querySelector('.tab[data-view=\"captures\"]').click()")
+        captures = tools.wait("""(() => {
+          const summary = document.querySelector('#capture-summary').textContent;
+          if (summary.startsWith('Loading')) return null;
+          return { summary, surfaces: document.querySelectorAll('.capture-surface').length,
+                   buttons: document.querySelectorAll('.capture-button').length,
+                   broken: [...document.querySelectorAll('#captures-view img')]
+                     .filter(image => image.complete && image.naturalWidth === 0).map(image => image.src) };
+        })()""", "the captures view to load api/captures.json", 6)
+        check(captures["surfaces"] > 0 and not captures["summary"].startswith("Captures unavailable"),
+              f"Captures view did not load the snapshot: {captures}")
+        check(captures["buttons"] == 0, f"Capture buttons shown in a static snapshot: {captures['buttons']}")
+        check(not captures["broken"], f"Capture images failed to load: {captures['broken']}")
+        passed.append(f"captures tab reads api/captures.json without capture buttons ({captures['summary']})")
+        if tools.js("document.querySelectorAll('#captures-view img').length"):
+            # api/captures.json keeps the live /captures/ URLs; the page must resolve them under the subpath.
+            loaded = tools.wait("[...document.querySelectorAll('#captures-view img')].filter(image => image.naturalWidth > 0)"
+                                ".map(image => new URL(image.src).pathname)[0]", "a capture image to load", 6)
+            passed.append(f"capture image loads from {loaded}")
+
+        passed.append(check_reset(tools, edit, clean))
+        calls = tools.js(backend_calls)
+        check(not calls, f"The snapshot called backend endpoints: {calls}")
+        check_no_exceptions(tools)
+    return passed
+
+
+def free_port() -> int:
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
+
+
+@contextlib.contextmanager
+def served_export():
+    """Export the studio into <tmp>/white-pill-studio/ and serve <tmp>, so the page has a path prefix."""
+    with tempfile.TemporaryDirectory(prefix="white-pill-static-") as parent:
+        target = pathlib.Path(parent) / "white-pill-studio"
+        result = subprocess.run([sys.executable, str(ROOT / "script" / "design-system"), "export", str(target)],
+                                capture_output=True, text=True)
+        if result.returncode:
+            raise SmokeFailure(f"script/design-system export failed:\n{result.stdout}{result.stderr}")
+        port = free_port()
+        server = subprocess.Popen([sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1", "--directory", parent],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            url = f"http://127.0.0.1:{port}/white-pill-studio/"
+            deadline = time.monotonic() + 5
+            while True:
+                try:
+                    urllib.request.urlopen(url + "api/state.json", timeout=1).read()
+                    break
+                except OSError:
+                    if time.monotonic() > deadline:
+                        raise SmokeFailure(f"static server not reachable at {url}") from None
+                    time.sleep(0.1)
+            yield url
+        finally:
+            server.terminate()
+            server.wait(5)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--url", default="http://127.0.0.1:4777")
+    parser.add_argument("--static-url", help="check a served static export (read-only snapshot) instead of a live studio")
+    parser.add_argument("--static", action="store_true", help="export the studio, serve it under a subpath, and check it")
+    parser.add_argument("--chromium", default=cdp.find_chromium())
+    args = parser.parse_args()
+    started = time.monotonic()
+    try:
+        if args.static:
+            with served_export() as url:
+                passed = run_static(url, args.chromium)
+        elif args.static_url:
+            url = args.static_url
+            passed = run_static(url, args.chromium)
+        else:
+            url = args.url
+            try:
+                urllib.request.urlopen(url.rstrip("/") + "/api/state", timeout=3).read()
+            except OSError as error:
+                print(f"browser-smoke: studio not reachable at {url}: {error}", file=sys.stderr)
+                return 2
+            passed = run_live(url, args.chromium)
+    except (SmokeFailure, cdp.CDPError) as failure:
+        print(f"browser-smoke: FAIL — {failure}", file=sys.stderr)
+        return 1
+    for line in passed:
+        print(f"ok  {line}")
+    print(f"browser-smoke: passed in {time.monotonic() - started:.1f}s against {url}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

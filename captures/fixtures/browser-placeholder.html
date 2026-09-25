@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>White Pill browser fixture</title>
+<!-- Placeholder served by captures.py only while the studio's web/fixtures/browser-page.html
+     is unavailable. The captured metadata records which page was used (browser.page.source). -->
+<style>
+  :root { color-scheme: light; --bg: #F0EDEC; --fg: #2C363C; --muted: #6f7478; --line: #CFC1BA; --accent: #1853C7; }
+  :root[data-mode="dark"] { color-scheme: dark; --bg: #1C1917; --fg: #B4BDC3; --muted: #8a8f93; --line: #403833; --accent: #6099C0; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 56px 40px; }
+  h1 { margin: 0 0 8px; font-size: 28px; letter-spacing: -.01em; }
+  p { margin: 0 0 16px; color: var(--muted); }
+  .rule { height: 1px; margin: 24px 0; background: var(--line); }
+  a { color: var(--accent); }
+</style>
+<script>
+  document.documentElement.dataset.mode = new URLSearchParams(location.search).get("scheme") === "dark" ? "dark" : "light";
+</script>
+</head>
+<body>
+<main>
+  <h1>White Pill browser fixture</h1>
+  <p>Placeholder page for native window captures.</p>
+  <div class="rule"></div>
+  <p>The studio serves the real fixture at <a href="/fixtures/browser-page.html">/fixtures/browser-page.html</a>.</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "chromium": "Chrome/152.0.7977.82",
+  "viewport": [
+    1600,
+    1000
+  ],
+  "deviceScaleFactor": 1,
+  "captured": "2026-09-25",
+  "specimens": [
+    "browser-dark",
+    "browser-light",
+    "foundations-dark",
+    "foundations-light",
+    "hunk-dark",
+    "hunk-light",
+    "shell-dark",
+    "shell-light",
+    "terminal-dark",
+    "terminal-light",
+    "windows-dark",
+    "windows-light"
+  ]
+}

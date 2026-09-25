@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.DS_Store
+# Native captures: PNGs stay local (machine-specific pixels); the JSON metadata
+# beside them is small, reviewable, and tracked. See captures/README.md.
+captures/*.png
+!captures/.gitkeep

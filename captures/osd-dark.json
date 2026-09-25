@@ -1,0 +1,72 @@
+{
+  "surface": "osd",
+  "mode": "dark",
+  "date": "2026-09-25T14:01:47+00:00",
+  "image": "osd-dark.png",
+  "box": {
+    "x": 1117,
+    "y": 1294,
+    "width": 325,
+    "height": 105
+  },
+  "scale": 1.5,
+  "pixels": {
+    "width": 487,
+    "height": 157
+  },
+  "monitor": "DP-2",
+  "method": "omarchy osd -i volume-medium -p 50 -d 0 (persistent, display only); card located by background-probe diff inside the fullscreen omarchy-osd layer; closed with `omarchy shell osd close`",
+  "located_by": "[popups] background-probe diff inside the omarchy-osd layer 0,0 2560x1440",
+  "deterministic": true,
+  "live": [],
+  "notes": "",
+  "backdrop": [
+    "helium"
+  ],
+  "versions": {
+    "quickshell": "0.3.1-1",
+    "qt6-base": "6.11.2-3",
+    "hyprland": "0.56.2-2",
+    "grim": "1.5.0-2"
+  },
+  "dotfiles": {
+    "path": "/home/mikker/.dotfiles",
+    "commit": "40522d223cda30487c374687ea630544f38ceef2",
+    "dirty": true
+  },
+  "studio": {
+    "commit": "uncommitted",
+    "tokens_sha256": "c7e3cbc3d0374837fe9c88f2a266eb4e4dbe39b0dfc33070dded371c5652ed23"
+  },
+  "theme": {
+    "user_theme": "Mekanikos Light",
+    "applied": "/home/mikker/.dotfiles/omarchy-themes/mekanikos",
+    "colors_sha256": "9426db62441a3c1d8be8c6425b12ea601098af7f49f4ce250e18890ea6c06aec",
+    "shell_sha256": "685ebde3eb7cb5c2ebe51e0bbeb750ca4f2df376dd7459485008fb0797ed1a88"
+  },
+  "font": {
+    "requested": "Inter Medium Tabular",
+    "family": "Inter",
+    "style": "Medium",
+    "file": "/usr/share/fonts/inter/Inter.ttc",
+    "fallback": false
+  },
+  "comparison": {
+    "browser_image": "osd-dark.browser.png",
+    "selector": "#shell-view .dark-preview .osd-specimen",
+    "clip": {
+      "x": 1104.3333740234375,
+      "y": 577,
+      "width": 324.3333435058594,
+      "height": 102.33333587646484
+    },
+    "device_scale": 1.5,
+    "result": {
+      "metric": "RMSE",
+      "absolute": 41290.4,
+      "normalized": 0.630051,
+      "note": "Browser specimen resized to the native pixel size; backdrops differ, so treat as a trend."
+    },
+    "date": "2026-09-25T14:08:33+00:00"
+  }
+}

@@ -1,0 +1,49 @@
+# Publishes a read-only snapshot of the studio to GitHub Pages.
+#
+# The live studio is a local Python server that edits tokens and regenerates
+# consumer files. The Pages build exports the same web UI with the API
+# responses frozen as JSON, so the specimens, inspector, provenance, adapters
+# manifest, and capture metadata can be browsed without a server.
+name: pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Unit tests
+        run: python -W error::ResourceWarning -m unittest discover -s tests
+      - name: Validate tokens
+        run: ./script/design-system validate
+      - name: Export static studio
+        run: ./script/design-system export dist
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

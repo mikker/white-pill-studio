@@ -1,0 +1,534 @@
+#!/usr/bin/env python3
+"""Measure specimens against their native captures.
+
+    script/align-check [--url URL] [--surface terminal browser osd notification]
+                       [--mode light dark] [--captures DIR] [--save DIR] [--json]
+
+For each surface and mode it decodes `captures/<surface>-<mode>.png`,
+resamples it to logical px with a box filter (honouring the crop's
+half-pixel offset), screenshots the matching specimen, and prints:
+
+- per-region RMSE (8-bit RGB units) between the two, and
+- landmark edges in logical px, with native − specimen deltas, and sampled
+  colours.
+
+Terminal and browser: the native crop comes from `script/capture run
+--surface windows`; the specimen is the standalone stage in the Windows view
+(`.<surface>-stage.<mode>-preview .hypr-window`, device scale 1), and
+coordinates are logical px from the window's outer box (border included).
+
+OSD and notification: the native capture is the card plus a 24px margin
+(`script/capture run --surface osd notification`); the specimen is the card
+in the Shell view with the same margin, screenshot at the native device
+scale and resampled the same way. The card is located by its inner keyline
+in both images (scanning outward from its padding, so the backdrop does not
+matter), and every landmark is relative to the keyline's top-left corner.
+
+Without --url a private studio is started against the canonical tokens.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import pathlib
+import runpy
+import sys
+import tempfile
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+import align  # noqa: E402
+import cdp  # noqa: E402
+import tokens_model  # noqa: E402
+import visual  # noqa: E402
+from align import Region  # noqa: E402
+
+VIEWPORT = (2400, 5200)  # tall enough that no specimen needs scrolling (sticky headers would cover it)
+FREEZE = """*, *::before, *::after { animation: none !important; transition: none !important; }
+#windows-view .windows-frame { max-width: none !important; overflow: visible !important; }"""
+READY = ("(() => { const screens = [...document.querySelectorAll('#windows-view .terminal-screen')];"
+         " const frames = [...document.querySelectorAll('#windows-view iframe')];"
+         " return screens.length > 0 && screens.every(screen => screen.dataset.ready)"
+         " && frames.every(frame => frame.contentDocument && frame.contentDocument.readyState === 'complete'); })()")
+SETTLE = ("Promise.all([...document.querySelectorAll('#windows-view iframe')].map(frame => frame.contentDocument.fonts.ready))"
+          ".then(() => document.fonts.ready).then(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))))")
+
+SHELL_SURFACES = ("osd", "notification")
+SHELL_MARGIN = 24  # captures.MARGIN: backdrop kept around a shell card
+SHELL_VIEWPORT = (1600, 1000)  # the viewport `script/capture compare` uses for shell specimens
+
+B = 4  # Hyprland border: the client area starts 4 logical px inside the box
+
+
+# Terminal: ghostty cell grid. Lines are 0-based rows of web/fixtures/terminal-session.ans.
+def terminal_regions(line: float, top: float) -> tuple:
+    """Regions for a grid of `line`-px cells starting `top` px into the client area."""
+    return (
+        Region("text", B, B, 780, top + 12 * line + 4),
+        Region("prompt-lines", B, B, 400, top + 2 * line),
+        Region("swatches", B, B + top + 11 * line, 260, line),
+    )
+
+
+def terminal_grid(tokens, mode: str) -> tuple:
+    """(cell height, top offset) from recipe.terminal, falling back to the first measured grid."""
+    return (recipe(tokens, "terminal", "cell-height", mode) or 31,
+            recipe(tokens, "terminal", "padding-top", mode) or 4)
+
+
+BROWSER_REGIONS = (
+    Region("tab", B, B, 250, 30),
+    Region("window-close", B, B, 40, 30, "right"),
+    Region("toolbar-left", B, B + 34, 110, 31),
+    Region("omnibox-text", B + 100, B + 34, 460, 28),
+    Region("toolbar-right", B, B + 34, 140, 31, "right"),
+    Region("page", B + 4, B + 66, 700, 440),
+)
+
+
+# ── Measurements ─────────────────────────────────────────────────────────
+
+
+def terminal_landmarks(image: align.Plane, tokens: tokens_model.Resolver, mode: str) -> dict:
+    background = align.mean_color(image, Region("bg", B + 600, B + 395, 10, 10))
+    found = {"background": align.to_hex(background)}
+    # clear of the border and the rounded client corner (radius 14)
+    line, top = terminal_grid(tokens, mode)
+    text = Region("text", B + 3, B + 6, 780, top + 12 * line - 3)
+    box = align.ink_box(image, text, background)
+    if box:
+        found["text-left"], found["text-top"] = box[0], box[1]
+    runs = align.ink_rows(image, text, background)
+    found["line-tops"] = [top for top, _ in runs]
+    if len(runs) >= 11:
+        # least-squares pitch through the line tops (same glyphs on both sides, so bearings cancel)
+        tops = [top for top, _ in runs[:11]]
+        mean_i, mean_t = 5, sum(tops) / 11
+        found["line-pitch"] = round(sum((i - mean_i) * (t - mean_t) for i, t in enumerate(tops))
+                                    / sum((i - mean_i) ** 2 for i in range(11)), 3)
+    for index, name in ((2, "ls-line-right"), (9, "design-line-right")):
+        row = Region(name, B + 2, B + top + index * line, 790, line)
+        box = align.ink_box(image, row, background)
+        if box:
+            found[name.replace("-right", "-left")], found[name] = box[0], box[2]
+    swatch = align.ink_box(image, Region("swatches", B + 2, B + top + 11 * line, 260, line), background, 30)
+    if swatch:
+        found["swatch-box"] = list(swatch)
+    return found
+
+
+def terminal_swatches(image: align.Plane, left: float, cell: float, top: float, height: float) -> list:
+    """Colours of the 16 ANSI swatches (columns 0–7 and 10–17 of line 11).
+
+    Iosevka's U+25A0 sits about 0.6 cell right of its cell (in ghostty and in
+    Chromium alike), so each swatch is sampled on its cell's right boundary.
+    """
+    colors = []
+    for index in range(16):
+        column = index if index < 8 else index + 2
+        x = left + (column + 1) * cell
+        y = top + height / 2
+        colors.append(align.mean_color(image, Region(f"ansi-{index}", x - 1, y - 1, 3, 3)))
+    return colors
+
+
+def browser_landmarks(image: align.Plane) -> dict:
+    found = {}
+    frame = align.mean_color(image, Region("frame", B + 56, B + 18, 4, 4, "right"))
+    omnibox = align.mean_color(image, Region("omnibox", B + 560, B + 46, 4, 4))
+    page = align.mean_color(image, Region("page", B + 600, B + 400, 4, 4))
+    new_tab = align.mean_color(image, Region("new-tab", B + 207, B + 6, 3, 3))
+    found["colors"] = {name: align.to_hex(value) for name, value in
+                       (("frame", frame), ("omnibox", omnibox), ("new-tab", new_tab), ("page", page)) if value}
+    # chrome tones differ by little (e.g. white frame vs #E1E1E2 omnibox), so a low threshold
+    found["omnibox-top"] = align.edge(image, "y", B + 560, B + 20, B + 50, 6)
+    found["omnibox-bottom"] = align.edge(image, "y", B + 560, B + 48, B + 70, 6)
+    found["omnibox-left"] = align.edge(image, "x", B + 48, B + 95, B + 130, 6)
+    found["omnibox-right"] = align.edge(image, "x", B + 48, B + 125, B + 145, 6, anchor="right")
+    found["toolbar-bottom"] = align.edge(image, "y", B + 64, B + 40, B + 80, 6)
+    found["content-top"] = align.edge(image, "y", B + 600, B + 90, B + 55, 6)
+    found["content-left"] = align.edge(image, "x", B + 300, B + 30, B - 1, 6)
+    found["new-tab-left"] = align.edge(image, "x", B + 8, B + 190, B + 215, 6)
+    found["new-tab-top"] = align.edge(image, "y", B + 208, B + 17, B - 2, 6)
+    found["new-tab-bottom"] = align.edge(image, "y", B + 208, B + 17, B + 34, 6)
+    for name, region, background in (
+        ("favicon", Region("favicon", B + 6, B + 5, 20, 24), frame),
+        ("tab-title", Region("tab-title", B + 30, B + 2, 120, 28), frame),
+        ("tab-close", Region("tab-close", B + 175, B + 2, 25, 28), frame),
+        ("window-close", Region("window-close", B + 8, B + 5, 20, 24, "right"), frame),
+        ("back", Region("back", B + 6, B + 36, 28, 24), frame),
+        ("forward", Region("forward", B + 36, B + 36, 28, 24), frame),
+        ("reload", Region("reload", B + 66, B + 36, 30, 24), frame),
+        ("site-info", Region("site-info", B + 104, B + 38, 22, 20), omnibox),
+        ("url", Region("url", B + 130, B + 38, 450, 20), omnibox),
+        ("menu", Region("menu", B + 8, B + 36, 24, 24, "right"), frame),
+        ("h1", Region("h1", B + 10, B + 70, 400, 70), page),
+        ("paragraph", Region("paragraph", B + 10, B + 140, 500, 60), page),
+    ):
+        if background is None:
+            continue
+        box = align.ink_box(image, region, background, 30 if name == "window-close" else 60)
+        if box:
+            found[name] = list(box)
+    return found
+
+
+def card_background(image: align.Plane, card: dict) -> tuple:
+    """Mean colour of the card's left padding on the middle row."""
+    return align.mean_color(image, Region("card", card["left"] + 5, image.height / 2 - 2, 4, 4))
+
+
+def half_ink(image: align.Plane, region: Region, background: tuple) -> float:
+    """Half the contrast of the region's strongest ink: an ink threshold that does not depend on the backdrop."""
+    strongest = align.strongest(image, region, background)
+    return max(20.0, align.distance(strongest, background) / 2) if strongest else 60.0
+
+
+def relative(box, card):
+    """A (left, top, right, bottom) box relative to the card keyline's top-left corner."""
+    if box is None:
+        return None
+    return [round(box[0] - card["left"], 2), round(box[1] - card["top"], 2),
+            round(box[2] - card["left"], 2), round(box[3] - card["top"], 2)]
+
+
+def osd_landmarks(image: align.Plane, accent: str) -> dict:
+    card = align.card_box(image, SHELL_MARGIN)
+    if card is None:
+        return {}
+    width, height = card["right"] - card["left"], card["bottom"] - card["top"]
+    found = {"card-size": [round(width, 2), round(height, 2)]}
+    background = card_background(image, card)
+    found["surface"] = align.to_hex(background)
+    inside = Region("inside", card["left"] + 2, card["top"] + 2, width - 4, height - 4)
+    fill = align.color_box(image, inside, align.hex_color(accent), 70)
+    if fill is None:
+        return found
+    found["fill"] = relative(fill, card)
+    middle = (fill[1] + fill[3]) / 2
+    # the unfilled track: scan along its middle row from the fill's end to the card's value text
+    track_right = align.edge(image, "x", middle, fill[2] + 2, card["right"] - 2, 6)
+    track_right_end = None
+    if track_right is not None:
+        # where the track colour ends again (back to the surface)
+        track_colour = image.pixel(int(fill[2] + 3), int(middle))
+        end = fill[2] + 3
+        while end < card["right"] - 2 and align.distance(image.pixel(int(end), int(middle)), background) > 6:
+            end += 1
+        track_right_end = end
+        found["track-colour"] = align.to_hex(track_colour)
+    column = (fill[2] + (track_right_end or fill[2] + 10)) / 2
+    top = align.edge(image, "y", column, middle - 8, middle, 6)
+    bottom = align.edge(image, "y", column, middle + 8, middle, 6)
+    if top is not None and bottom is not None and track_right_end is not None:
+        found["track"] = relative((fill[0], top, track_right_end, bottom), card)
+        found["track-height"] = round(bottom - top, 2)
+        found["track-length"] = round(track_right_end - fill[0], 2)
+    # clear of the rounded corners, where the backdrop shows
+    region = Region("icon", card["left"] + 6, card["top"] + 8, fill[0] - card["left"] - 10, height - 16)
+    icon = align.ink_box(image, region, background, half_ink(image, region, background))
+    found["icon-ink"] = relative(icon, card)
+    right = track_right_end or fill[2]
+    region = Region("value", right + 3, card["top"] + 8, card["right"] - right - 9, height - 16)
+    value = align.ink_box(image, region, background, half_ink(image, region, background))
+    found["value-ink"] = relative(value, card)
+    if value:
+        found["value-colour"] = align.to_hex(align.strongest(image, Region("v", value[0], value[1], value[2] - value[0],
+                                                                           value[3] - value[1]), background))
+    return found
+
+
+def notification_landmarks(image: align.Plane) -> dict:
+    card = align.card_box(image, SHELL_MARGIN)
+    if card is None:
+        return {}
+    width, height = card["right"] - card["left"], card["bottom"] - card["top"]
+    found = {"card-size": [round(width, 2), round(height, 2)]}
+    background = card_background(image, card)
+    found["surface"] = align.to_hex(background)
+    inside = Region("inside", card["left"] + 6, card["top"] + 6, width - 12, height - 12)
+    threshold = half_ink(image, inside, background)
+    runs = align.ink_rows(image, inside, background, threshold)
+    lines = []
+    for top, bottom in runs:
+        box = align.ink_box(image, Region("line", inside.x, top, inside.width, bottom - top), background, threshold)
+        colour = align.strongest(image, Region("line", box[0], top, box[2] - box[0], bottom - top), background)
+        lines.append({"box": relative(box, card), "ink": align.to_hex(colour)})
+    if lines:
+        found["title"] = lines[0]["box"]
+        # hinting at 1.5x changes glyph heights by a pixel, so compare line centres too
+        found["title-middle"] = round((lines[0]["box"][1] + lines[0]["box"][3]) / 2, 2)
+        found["title-ink"] = lines[0]["ink"]
+    if len(lines) > 1:
+        found["body-lines"] = [line["box"] for line in lines[1:]]
+        found["body-ink"] = lines[1]["ink"]
+        found["body-first"] = lines[1]["box"]
+        found["body-middle"] = round((lines[1]["box"][1] + lines[1]["box"][3]) / 2, 2)
+        found["body-last"] = lines[-1]["box"]
+        found["body-line-count"] = len(lines) - 1
+    return found
+
+
+def shell_rmse(native: align.Plane, specimen: align.Plane, left: dict, right: dict) -> dict:
+    """RMSE over the card interior (keyline inset by 2px), aligned on each image's keyline."""
+    result = {}
+    if not left or not right:
+        return result
+    width = int(min(left["right"] - left["left"], right["right"] - right["left"])) - 4
+    height = int(min(left["bottom"] - left["top"], right["bottom"] - right["top"])) - 4
+    a = align.crop(native, round(left["left"]) + 2, round(left["top"]) + 2, width, height)
+    b = align.crop(specimen, round(right["left"]) + 2, round(right["top"]) + 2, width, height)
+    rmse, count = align.region_rmse(a, b, Region("card", 0, 0, width, height))
+    result["card-interior"] = {"rmse": None if rmse is None else round(rmse, 2), "pixels": count}
+    return result
+
+
+def recipe(tokens: tokens_model.Resolver, name: str, field: str, mode: str):
+    try:
+        return tokens.value(f"recipe.{name}.{field}", mode)
+    except tokens_model.ReferenceProblem:
+        return None
+
+
+# ── Capture ──────────────────────────────────────────────────────────────
+
+
+def open_view(url: str, view: str, width: int, height: int, scale: float) -> cdp.Browser:
+    """A studio page on `view`, rendered, with animations frozen."""
+    browser = cdp.launch(url.rstrip("/") + f"/#{view}", width=width, height=height, scale=scale)
+    try:
+        browser.wait("document.querySelectorAll('.token-row').length > 0", "the studio to render", 10)
+        browser.evaluate(f"(() => {{ const style = document.createElement('style'); style.textContent = {json.dumps(FREEZE)};"
+                         " document.head.append(style); })()")
+        browser.evaluate(f"document.querySelector('.tab[data-view=\"{view}\"]').click()")
+    except BaseException:
+        browser.close()
+        raise
+    return browser
+
+
+def page_box(browser: cdp.Browser, selector: str, scroll: bool = False) -> dict:
+    """The page-coordinate box of `selector` (optionally scrolled into view first)."""
+    rect = browser.evaluate(f"""(() => {{
+      const node = document.querySelector({json.dumps(selector)});
+      if (!node) return null;
+      {'node.scrollIntoView({block: "center"});' if scroll else ''}
+      const box = node.getBoundingClientRect();
+      return {{ x: box.left + scrollX, y: box.top + scrollY, width: box.width, height: box.height }};
+    }})()""")
+    if not rect:
+        raise cdp.CDPError(f"{selector} is not rendered")
+    return rect
+
+
+def specimen_shots(url: str, wanted: list, directory: pathlib.Path) -> dict:
+    """Screenshot each standalone specimen window at device scale 1."""
+    browser = open_view(url, "windows", *VIEWPORT, scale=1)
+    shots = {}
+    try:
+        browser.wait(READY, "the window specimens to load", 10)
+        browser.evaluate(SETTLE)
+        for surface, mode in wanted:
+            path = directory / f"{surface}-{mode}.specimen.png"
+            browser.screenshot(path, clip=page_box(browser, f"#windows-view .{surface}-stage.{mode}-preview .hypr-window"))
+            shots[(surface, mode)] = path
+    finally:
+        browser.close()
+    return shots
+
+
+def shell_shots(url: str, wanted: list, directory: pathlib.Path, captures: pathlib.Path) -> dict:
+    """Screenshot each shell specimen with the capture margin, at its native capture's device scale."""
+    shots = {}
+    for surface, mode in wanted:
+        scale = float(json.loads((captures / f"{surface}-{mode}.json").read_text()).get("scale", 1))
+        browser = open_view(url, "shell", *SHELL_VIEWPORT, scale=scale)
+        try:
+            browser.evaluate("document.fonts.ready.then(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))))")
+            rect = page_box(browser, f"#shell-view .{mode}-preview .{surface}-specimen", scroll=True)
+            clip = {"x": rect["x"] - SHELL_MARGIN, "y": rect["y"] - SHELL_MARGIN,
+                    "width": rect["width"] + 2 * SHELL_MARGIN, "height": rect["height"] + 2 * SHELL_MARGIN}
+            path = directory / f"{surface}-{mode}.specimen.png"
+            browser.screenshot(path, clip=clip)
+            shots[(surface, mode)] = (path, scale)
+        finally:
+            browser.close()
+    return shots
+
+
+def native_plane(captures: pathlib.Path, surface: str, mode: str, rows: int) -> tuple:
+    """(the native capture resampled to logical px, at most `rows` tall; its metadata)."""
+    meta = json.loads((captures / f"{surface}-{mode}.json").read_text())
+    image = visual.read(captures / f"{surface}-{mode}.png")
+    scale = float(meta["scale"])
+    box = meta["box"]
+    # window crops record their pixel origin; shell captures are `grim -g <logical box>`, which truncates
+    crop = meta.get("crop_pixels") or {"x": int(box["x"] * scale), "y": int(box["y"] * scale)}
+    # grim truncates the crop origin; the logical box can start part-way into the first device pixel
+    offset = (max(0.0, box["x"] * scale - crop["x"]), max(0.0, box["y"] * scale - crop["y"]))
+    width = int((image.width - offset[0]) / scale)
+    height = min(rows, int((image.height - offset[1]) / scale))
+    return align.resample(image, scale, offset, (width, height)), meta
+
+
+# ── Report ───────────────────────────────────────────────────────────────
+
+
+def delta(native, specimen):
+    if isinstance(native, (int, float)) and isinstance(specimen, (int, float)):
+        return round(native - specimen, 2)
+    if isinstance(native, list) and isinstance(specimen, list) and len(native) == len(specimen) \
+            and all(isinstance(item, (int, float)) for item in native + specimen):
+        return [round(a - b, 2) for a, b in zip(native, specimen)]
+    return None
+
+
+def fmt(value):
+    if isinstance(value, float):
+        return f"{value:.2f}"
+    return json.dumps(value) if not isinstance(value, str) else value
+
+
+def measure(surface: str, mode: str, native: align.Plane, specimen: align.Plane, tokens) -> dict:
+    result = {"surface": surface, "mode": mode, "native_size": [native.width, native.height],
+              "specimen_size": [specimen.width, specimen.height], "regions": {}}
+    if surface in SHELL_SURFACES:
+        result["regions"] = shell_rmse(native, specimen, align.card_box(native, SHELL_MARGIN),
+                                       align.card_box(specimen, SHELL_MARGIN))
+    else:
+        regions = terminal_regions(*terminal_grid(tokens, mode)) if surface == "terminal" else BROWSER_REGIONS
+        for region in regions:
+            rmse, count = align.region_rmse(native, specimen, region)
+            result["regions"][region.name] = {"rmse": None if rmse is None else round(rmse, 2), "pixels": count}
+
+    def landmarks(image: align.Plane) -> dict:
+        if surface == "osd":
+            return osd_landmarks(image, tokens.value(f"color.{mode}.accent"))
+        if surface == "notification":
+            return notification_landmarks(image)
+        if surface == "terminal":
+            return terminal_landmarks(image, tokens, mode)
+        return browser_landmarks(image)
+
+    left, right = landmarks(native), landmarks(specimen)
+    result["landmarks"] = {key: {"native": left.get(key), "specimen": right.get(key),
+                                 "delta": delta(left.get(key), right.get(key))} for key in dict.fromkeys([*left, *right])}
+    return result
+
+
+def ansi_check(native: align.Plane, specimen: align.Plane, tokens, mode: str, meta: dict) -> dict:
+    """Sampled swatch colours (native and specimen) against recipe.terminal.ansi-N, plus ghostty's effective config."""
+    padding_x = recipe(tokens, "terminal", "padding-x", mode) or 8
+    padding_top = recipe(tokens, "terminal", "padding-top", mode) or 4
+    cell = recipe(tokens, "terminal", "cell-width", mode) or 10.5
+    line = recipe(tokens, "terminal", "cell-height", mode) or 31
+    left, top = B + padding_x, B + padding_top + 11 * line
+    samples = terminal_swatches(native, left, cell, top, line)
+    drawn = terminal_swatches(specimen, left, cell, top, line)
+    rows = []
+    for index, (color, shown) in enumerate(zip(samples, drawn)):
+        expected = recipe(tokens, "terminal", f"ansi-{index}", mode)
+        rows.append({"slot": index, "recipe": expected, "native": align.to_hex(color),
+                     "specimen": align.to_hex(shown),
+                     "native_delta": round(align.distance(color, align.hex_color(expected)), 1) if expected else None,
+                     "specimen_delta": round(align.distance(shown, align.hex_color(expected)), 1) if expected else None})
+    effective = (meta.get("ghostty") or {}).get("effective") or {}
+    config = {}
+    palette = {entry.split("=", 1)[0]: entry.split("=", 1)[1] for entry in effective.get("palette", [])}
+    for field, key in (("background", "background"), ("foreground", "foreground"),
+                       ("selection", "selection-background"), ("selection-foreground", "selection-foreground"),
+                       ("cursor", "cursor-color"), ("cursor-text", "cursor-text")):
+        config[field] = {"recipe": recipe(tokens, "terminal", field, mode), "ghostty": effective.get(key)}
+    for index in range(16):
+        config[f"ansi-{index}"] = {"recipe": recipe(tokens, "terminal", f"ansi-{index}", mode),
+                                   "ghostty": palette.get(str(index))}
+    mismatched = [name for name, pair in config.items()
+                  if pair["recipe"] and pair["ghostty"] and pair["recipe"].lower() != pair["ghostty"].lower()]
+    return {"swatches": rows, "config": config, "config_mismatches": mismatched}
+
+
+def print_result(result: dict) -> None:
+    print(f"\n{result['surface']} {result['mode']}  native {result['native_size'][0]}×{result['native_size'][1]} "
+          f"logical, specimen {result['specimen_size'][0]}×{result['specimen_size'][1]}")
+    print("  region RMSE (8-bit RGB):")
+    for name, value in result["regions"].items():
+        print(f"    {name:<16} {fmt(value['rmse']):>7}   ({value['pixels']} px)")
+    print("  landmarks (logical px; delta = native − specimen):")
+    for name, value in result["landmarks"].items():
+        print(f"    {name:<18} native {fmt(value['native']):<28} specimen {fmt(value['specimen']):<28}"
+              + (f" Δ {fmt(value['delta'])}" if value["delta"] is not None else ""))
+    if "ansi" in result:
+        ansi = result["ansi"]
+        worst_native = max((row["native_delta"] or 0) for row in ansi["swatches"])
+        worst_specimen = max((row["specimen_delta"] or 0) for row in ansi["swatches"])
+        print(f"  ANSI swatches: max channel Δ vs recipe  native {worst_native}  specimen {worst_specimen}")
+        for row in ansi["swatches"]:
+            print(f"    ansi-{row['slot']:<3} recipe {row['recipe']}  native {row['native']} (Δ{row['native_delta']})"
+                  f"  specimen {row['specimen']} (Δ{row['specimen_delta']})")
+        print("  ghostty effective vs recipe.terminal: "
+              + ("all equal" if not ansi["config_mismatches"] else "differ: " + ", ".join(
+                  f"{name} ({ansi['config'][name]['ghostty']} vs {ansi['config'][name]['recipe']})"
+                  for name in ansi["config_mismatches"])))
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--url", help="a running studio (default: start a private one on the canonical tokens)")
+    parser.add_argument("--surface", nargs="+", choices=("terminal", "browser", *SHELL_SURFACES),
+                        default=["terminal", "browser"])
+    parser.add_argument("--mode", nargs="+", choices=("light", "dark"), default=["light", "dark"])
+    parser.add_argument("--captures", default=str(ROOT / "captures"), help="directory with the native captures")
+    parser.add_argument("--save", help="also write the specimen screenshots and resampled native crops here")
+    parser.add_argument("--json", action="store_true", help="print JSON instead of a table")
+    args = parser.parse_args()
+
+    captures = pathlib.Path(args.captures)
+    wanted = [(surface, mode) for surface in args.surface for mode in args.mode
+              if (captures / f"{surface}-{mode}.png").exists()]
+    if not wanted:
+        print("align-check: no native captures (run script/capture run --surface windows osd notification)",
+              file=sys.stderr)
+        return 2
+    tokens = tokens_model.Resolver(tokens_model.load(ROOT / "design-system" / "tokens.toml"))
+    visual_baseline = runpy.run_path(str(ROOT / "script" / "visual-baseline"), run_name="visual_baseline")  # its Studio helper
+    results = []
+    with tempfile.TemporaryDirectory(prefix="white-pill-align-") as scratch:
+        directory = pathlib.Path(args.save) if args.save else pathlib.Path(scratch)
+        directory.mkdir(parents=True, exist_ok=True)
+        try:
+            with visual_baseline["Studio"](args.url) as studio:
+                windowed = [item for item in wanted if item[0] not in SHELL_SURFACES]
+                shell = [item for item in wanted if item[0] in SHELL_SURFACES]
+                shots = specimen_shots(studio.url, windowed, directory) if windowed else {}
+                shell_specimens = shell_shots(studio.url, shell, directory, captures) if shell else {}
+        except (visual_baseline["Unavailable"], cdp.CDPError) as error:
+            print(f"align-check: {error}", file=sys.stderr)
+            return 2
+        for surface, mode in wanted:
+            if surface in SHELL_SURFACES:
+                path, scale = shell_specimens[(surface, mode)]
+                specimen = align.resample(visual.read(path), scale)
+            else:
+                specimen = align.plane(visual.read(shots[(surface, mode)]))
+            native, meta = native_plane(captures, surface, mode, rows=560)
+            result = measure(surface, mode, native, specimen, tokens)
+            if surface == "terminal":
+                result["ansi"] = ansi_check(native, specimen, tokens, mode, meta)
+            result["native_date"] = meta.get("date")
+            results.append(result)
+            if args.save:
+                visual.write(directory / f"{surface}-{mode}.native-logical.png", align.to_image(native))
+                if surface in SHELL_SURFACES:
+                    visual.write(directory / f"{surface}-{mode}.specimen-logical.png", align.to_image(specimen))
+    if args.json:
+        print(json.dumps(results, indent=2))
+    else:
+        for result in results:
+            print_result(result)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
