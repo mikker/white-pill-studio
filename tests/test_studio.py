@@ -165,7 +165,8 @@ class ExportTest(unittest.TestCase):
             self.assertEqual((out / "captures" / "bar-light.png").read_bytes(), b"png")
             state = json.loads((out / "api" / "state.json").read_text())
             self.assertTrue(state["ok"])
-            self.assertEqual(state["source"], str(source))
+            # Exported paths are repo-relative so the public snapshot does not embed the machine layout.
+        self.assertEqual(state["source"], "design-system/tokens.toml")
             self.assertEqual(state["raw"]["spacing"]["control-height"], 28)
             self.assertEqual([c["name"] for c in state["manifest"]["consumers"]], ["studio", "dots"])
             listed = json.loads((out / "api" / "captures.json").read_text())

@@ -304,7 +304,9 @@ def export_command(context, directory: pathlib.Path) -> int:
     # user's home are written as ~/... rather than leaking the account name.
     home = str(pathlib.Path.home())
     for name, payload in (("state.json", state), ("captures.json", captures.list_captures(captures_dir))):
-        (api / name).write_text(json.dumps(payload, ensure_ascii=False).replace(home, "~"))
+        text = json.dumps(payload, ensure_ascii=False)
+        text = text.replace(str(context.root) + "/", "").replace(str(context.root), ".").replace(home, "~")
+        (api / name).write_text(text)
     copied = [path for pattern in ("*.png", "*.json") for path in sorted(captures_dir.glob(pattern)) if path.is_file()]
     if copied:
         (directory / "captures").mkdir(exist_ok=True)
