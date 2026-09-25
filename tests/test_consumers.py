@@ -122,8 +122,11 @@ class Workspace:
         (self.root / "design-system" / "consumers.toml").write_text(consumers_toml.format(root=self.root))
 
     def run(self, *args, env=None):
+        # The fontconfig family check depends on the machine's fonts; these
+        # tests exercise the CLI, not the font set of whoever runs them.
+        run_env = {**(env or CLEAN_ENV), "WHITE_PILL_FONT_CHECK": "0"}
         return subprocess.run([sys.executable, str(SCRIPT), "--source", str(self.source), *args],
-                              capture_output=True, text=True, env=env or CLEAN_ENV, cwd=self.root)
+                              capture_output=True, text=True, env=run_env, cwd=self.root)
 
     def close(self):
         self.directory.cleanup()

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import fnmatch
 import functools
+import os
 import pathlib
 import re
 import shutil
@@ -555,7 +556,10 @@ def fc_families(family: str) -> list | None:
 
     Returns None when fontconfig is unavailable, so callers skip the check.
     """
-    if shutil.which("fc-match") is None:
+    # The check is per machine: it asks the local fontconfig. CI runners and
+    # other machines without the design system's fonts set
+    # WHITE_PILL_FONT_CHECK=0 to skip it rather than fail on their own font set.
+    if os.environ.get("WHITE_PILL_FONT_CHECK") == "0" or shutil.which("fc-match") is None:
         return None
     try:
         result = subprocess.run(

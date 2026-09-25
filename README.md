@@ -97,6 +97,7 @@ Details, guarantees, and limits: [`captures/README.md`](captures/README.md).
 ```sh
 script/design-system generate   # validate, then regenerate studio CSS and every consumer's adapters
 script/design-system check      # validate and detect output drift, per consumer repository
+WHITE_PILL_FONT_CHECK=0 …       # skip the per-machine fontconfig family check (used in CI)
 script/design-system validate   # list color, opacity, dimension, contrast, key, and reference issues
 script/design-system manifest   # print every consumer, generated target, and field as JSON
 script/design-system consumers  # print resolved consumer roots and their git state (--json)

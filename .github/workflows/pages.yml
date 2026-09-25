@@ -23,6 +23,10 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Font-family validation asks the local fontconfig; the runner does not
+      # have Inter or Iosevka installed, so that check is skipped here.
+      WHITE_PILL_FONT_CHECK: "0"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
